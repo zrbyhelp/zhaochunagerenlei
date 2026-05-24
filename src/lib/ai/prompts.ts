@@ -57,11 +57,11 @@ export function actionPrompt(request: AiActionRequest) {
     "Keep the answer concise, like a player speaking in the moment.",
     "You only know your own word and public table talk.",
     "You do not know whether you are ordinary or undercover, and you do not know the true word pair.",
-    "Reason cautiously: infer the likely real majority word from public speeches, and consider that you may have the different word.",
+    "Reason with uncertainty. Do not assume you can reliably identify the majority word or the different-word player.",
     languageInstruction(request.locale),
     `Your public name: ${request.actor.name}.`,
     persona
-      ? `Your stable speaking persona: ${persona.label}. Style: ${persona.speakingStyle}. Habit phrases you may use sparingly: ${persona.catchphrases.join(", ")}. Reasoning style: ${persona.reasoningStyle}.`
+      ? `Your stable speaking persona: ${persona.label}. Style: ${persona.speakingStyle}. Habit phrases you may use sparingly: ${persona.catchphrases.join(", ")}. Reasoning style: ${persona.reasoningStyle}. Voting bias: ${persona.votingBias}.`
       : "Use a natural casual player voice with small personal quirks.",
   ];
 
@@ -94,11 +94,15 @@ export function actionPrompt(request: AiActionRequest) {
     return {
       system: base.join("\n"),
       user: JSON.stringify({
-        task: "Choose the player most likely to have received a different word based on public phase-one speeches.",
+        task: "Vote like a normal table-game player, not a perfect detective.",
         requirements: [
           "You only know your own word, not your hidden identity.",
-          "Infer the likely real majority word from how most people described theirs.",
-          "Consider that you may have the different word, so be cautious when judging others.",
+          "Do not optimize for the single best semantic outlier.",
+          "Use your voting bias even when it means choosing someone who is only mildly suspicious.",
+          "Consider currentVotes if provided: a follow-the-room persona may follow them, while other personas may ignore or resist them.",
+          "Consider quiet, repetitive, overconfident, hesitant, or inconsistent table behavior according to your persona.",
+          "If several people are plausible, pick among them in a human, imperfect way.",
+          "Remember you may have the different word yourself, so do not be too accurate or too certain.",
           "Only return targetId. Do not output any explanation or reason.",
         ],
         outputShape: { targetId: "candidate id" },
@@ -142,6 +146,8 @@ export function actionPrompt(request: AiActionRequest) {
       task: "Vote for the participant most likely to be the hidden human based on phase-one context and phase-two defenses.",
       requirements: [
         "You still do not know hidden roles or the true word pair; judge only from public behavior.",
+        "Use your voting bias. You are allowed to follow the room, avoid conflict, trust a gut read, or suspect quiet/repetitive players.",
+        "Do not act like a perfectly calibrated detector.",
         "Write the reason like a real player making a final vote.",
         "Use concrete behavior from the chat instead of generic summaries.",
         "Do not sound like a judge or report.",

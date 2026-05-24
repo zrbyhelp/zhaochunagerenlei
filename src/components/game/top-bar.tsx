@@ -3,6 +3,7 @@
 import { Languages, Settings } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { Link, type AppLocale, routing } from "@/i18n/routing";
 
 const githubUrl = "https://github.com/zrbyhelp/zhaochunagerenlei";
@@ -13,6 +14,7 @@ export function TopBar() {
   const locale = useLocale() as AppLocale;
   const pathname = usePathname();
   const router = useRouter();
+  const [languageOpen, setLanguageOpen] = useState(false);
 
   function switchLocale(nextLocale: AppLocale) {
     const segments = pathname.split("/");
@@ -25,6 +27,7 @@ export function TopBar() {
     }
 
     const nextPath = segments.join("/") || `/${nextLocale}`;
+    setLanguageOpen(false);
     router.replace(`${nextPath}${window.location.search}${window.location.hash}`);
   }
 
@@ -55,23 +58,36 @@ export function TopBar() {
         >
           <Settings size={16} />
         </Link>
-        <label
-          className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--panel-strong)]"
-          title={t("language")}
-        >
-          <Languages size={14} />
-          <select
+        <div className="relative">
+          <button
+            aria-expanded={languageOpen}
             aria-label={t("language")}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            value={locale}
-            onChange={(event) =>
-              switchLocale(event.target.value as AppLocale)
-            }
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--panel-strong)]"
+            onClick={() => setLanguageOpen((open) => !open)}
+            title={t("language")}
+            type="button"
           >
-            <option value="zh-CN">中文</option>
-            <option value="en-US">English</option>
-          </select>
-        </label>
+            <Languages size={14} />
+          </button>
+          {languageOpen ? (
+            <div className="absolute right-0 z-20 mt-2 grid min-w-28 gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] p-1 text-sm shadow-lg shadow-black/15">
+              {routing.locales.map((item) => (
+                <button
+                  className={`rounded-md px-3 py-2 text-left transition ${
+                    locale === item
+                      ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
+                      : "text-[var(--foreground)] hover:bg-[var(--panel)]"
+                  }`}
+                  key={item}
+                  onClick={() => switchLocale(item)}
+                  type="button"
+                >
+                  {item === "zh-CN" ? "中文" : "English"}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </nav>
     </header>
   );

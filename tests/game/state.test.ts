@@ -41,6 +41,7 @@ describe("game state", () => {
     });
     expect(state.participants.slice(1).every((item) => item.kind === "ai")).toBe(true);
     expect(state.participants.slice(1).every((item) => item.persona)).toBe(true);
+    expect(state.participants.slice(1).every((item) => item.persona?.votingBias)).toBe(true);
     expect(state.participants.slice(1).map((item) => item.name)).not.toContain("星图零一");
     expect(state.speakingOrder).toHaveLength(4);
   });

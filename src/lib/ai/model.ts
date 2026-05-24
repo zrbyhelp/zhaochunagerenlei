@@ -17,6 +17,8 @@ type FlushableOpenAI = OpenAI & {
   flushAsync?: () => Promise<void>;
 };
 
+const maxModelAttempts = 3;
+
 function createClient(traceName: string): { client: FlushableOpenAI; model: string } {
   const env = readModelEnv();
 
@@ -64,30 +66,64 @@ async function completeJson(
   return completion.choices[0]?.message.content ?? "";
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function shouldRetryModelError(error: unknown) {
+  return !(error instanceof Error && error.message === "MODEL_ENV_INVALID");
+}
+
+async function withModelRetry<T>(operation: (attempt: number) => Promise<T>): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxModelAttempts; attempt += 1) {
+    try {
+      return await operation(attempt);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= maxModelAttempts || !shouldRetryModelError(error)) {
+        break;
+      }
+
+      await wait(180 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("MODEL_RETRY_FAILED");
+}
+
 export async function generateWordPair(
   locale: Locale,
   options: Parameters<typeof wordPairPrompt>[1] = {},
 ): Promise<WordPairOutput> {
   const prompt = wordPairPrompt(locale, options);
-  const content = await completeJson("game.word_pair", [
-    { role: "system", content: prompt.system },
-    { role: "user", content: prompt.user },
-  ], { temperature: 0.98, topP: 0.95 });
 
-  return parseModelJson(content, WordPairSchema);
+  return withModelRetry(async (attempt) => {
+    const content = await completeJson(`game.word_pair.attempt_${attempt}`, [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ], { temperature: 0.98, topP: 0.95 });
+
+    return parseModelJson(content, WordPairSchema);
+  });
 }
 
 export async function runAiAction(input: unknown) {
   const request = AiActionRequestSchema.parse(input);
   const prompt = actionPrompt(request);
-  const content = await completeJson(`game.${request.action}`, [
-    { role: "system", content: prompt.system },
-    { role: "user", content: prompt.user },
-  ]);
-  const output = parseModelJson(content, responseSchemaForAction(request.action));
-  validateTarget(request, output);
 
-  return output;
+  return withModelRetry(async (attempt) => {
+    const content = await completeJson(`game.${request.action}.attempt_${attempt}`, [
+      { role: "system", content: prompt.system },
+      { role: "user", content: prompt.user },
+    ]);
+    const output = parseModelJson(content, responseSchemaForAction(request.action));
+    validateTarget(request, output);
+
+    return output;
+  });
 }
 
 function validateTarget(

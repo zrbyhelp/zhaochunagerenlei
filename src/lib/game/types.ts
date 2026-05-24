@@ -26,6 +26,7 @@ export type AiPersona = {
   speakingStyle: string;
   catchphrases: string[];
   reasoningStyle: string;
+  votingBias: string;
 };
 
 export type Participant = {

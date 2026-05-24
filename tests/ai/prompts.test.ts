@@ -34,6 +34,7 @@ describe("AI prompts", () => {
           speakingStyle: "话比较短，像朋友桌游局随口说。",
           catchphrases: ["说实话"],
           reasoningStyle: "更多从直觉和日常体验切入。",
+          votingBias: "跟风偏差：容易受已经出现的票影响。",
         },
       },
       candidates: [{ id: "player", name: "玩家" }],
@@ -41,6 +42,8 @@ describe("AI prompts", () => {
     });
 
     expect(prompt.system).toContain("轻松吐槽型");
+    expect(prompt.system).toContain("Voting bias");
+    expect(prompt.system).toContain("跟风偏差");
     expect(prompt.system).toContain("Speak naturally");
     expect(prompt.user).toContain("real player");
     expect(prompt.user).toContain("worried you might be the undercover");
@@ -64,7 +67,10 @@ describe("AI prompts", () => {
 
     expect(joined).toContain("You only know your own word");
     expect(joined).toContain("do not know whether you are ordinary or undercover");
-    expect(joined).toContain("Infer the likely real majority word");
+    expect(joined).toContain("not a perfect detective");
+    expect(joined).toContain("Do not optimize for the single best semantic outlier");
+    expect(joined).toContain("Use your voting bias");
+    expect(joined).toContain("currentVotes");
     expect(joined).toContain("you may have the different word");
     expect(joined).toContain("Only return targetId");
     expect(joined).not.toContain("\"reason\":\"string\"");

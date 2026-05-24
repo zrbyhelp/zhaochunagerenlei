@@ -17,6 +17,7 @@ export const AiActorSchema = z.object({
       speakingStyle: z.string().min(1),
       catchphrases: z.array(z.string().min(1)).min(1),
       reasoningStyle: z.string().min(1),
+      votingBias: z.string().min(1),
     })
     .optional(),
 });

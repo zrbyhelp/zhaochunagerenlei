@@ -56,7 +56,8 @@ describe("navigation and admin", () => {
     const user = userEvent.setup();
     renderWithMessages(<TopBar />);
 
-    await user.selectOptions(screen.getByRole("combobox"), "en-US");
+    await user.click(screen.getByLabelText("语言"));
+    await user.click(screen.getByRole("button", { name: "English" }));
 
     expect(navigation.replace).toHaveBeenCalledWith("/en-US/admin");
   });
@@ -69,7 +70,7 @@ describe("navigation and admin", () => {
       "https://github.com/zrbyhelp/zhaochunagerenlei",
     );
     expect(screen.getByLabelText("后台")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "语言" })).toBeInTheDocument();
+    expect(screen.getByLabelText("语言")).toBeInTheDocument();
     expect(screen.queryByText("后台")).not.toBeInTheDocument();
   });
 

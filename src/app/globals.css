@@ -30,12 +30,17 @@
 }
 
 :root[data-theme-mode="light"] {
-  --background: #edf5f8;
-  --foreground: #10202b;
-  --muted-foreground: #587080;
-  --panel: rgba(255, 255, 255, 0.82);
-  --panel-strong: rgba(247, 252, 253, 0.96);
-  --line: rgba(22, 55, 73, 0.18);
+  --background: #f6fafc;
+  --foreground: #13242f;
+  --muted-foreground: #506875;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-strong: rgba(246, 251, 253, 0.98);
+  --line: rgba(32, 84, 108, 0.22);
+  --accent: #087f6b;
+  --accent-foreground: #f7fffd;
+  --accent-glow: rgba(8, 127, 107, 0.14);
+  --warning: #9a6a00;
+  --danger: #b33a4a;
 }
 
 :root[data-palette="matrix"] {
@@ -128,6 +133,13 @@ select {
     48px 48px,
     48px 48px,
     cover;
+}
+
+:root[data-theme-mode="light"] .world-surface {
+  background-image:
+    linear-gradient(rgba(40, 104, 130, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 104, 130, 0.08) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(212, 235, 241, 0.86), rgba(246, 250, 252, 0.94) 46%, var(--background));
 }
 
 .panel {

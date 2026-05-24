@@ -4,7 +4,7 @@ import { TopBar } from "@/components/game/top-bar";
 
 export default function HomePage() {
   return (
-    <div className="world-surface min-h-screen">
+    <div className="world-surface flex min-h-dvh flex-col">
       <TopBar />
       <GameShell />
       <Toaster richColors position="top-center" />

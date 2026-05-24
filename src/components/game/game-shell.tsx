@@ -81,6 +81,10 @@ function candidatePayload(candidates: Participant[]) {
   return candidates.map(({ id, name }) => ({ id, name }));
 }
 
+function votePayload(votes: Array<Pick<VoteRecord, "voterId" | "targetId">>) {
+  return votes.map(({ voterId, targetId }) => ({ voterId, targetId }));
+}
+
 export function GameShell() {
   const t = useTranslations("game");
   const locale = useLocale() as Locale;
@@ -266,6 +270,7 @@ export function GameShell() {
             participants: publicParticipants(state),
             speeches: state.speeches,
             previousVotes: state.phase1Votes,
+            currentVotes: votePayload(votes),
             eliminations: state.eliminations,
           },
         });
@@ -329,6 +334,7 @@ export function GameShell() {
           context: {
             phaseOne: buildPhase2Context(state),
             phaseTwoStatements: state.phase2Statements,
+            currentVotes: votePayload(votes),
           },
         });
         votes.push({
@@ -348,8 +354,12 @@ export function GameShell() {
   }
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl gap-3 px-3 pb-5 sm:gap-4 sm:px-6 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="panel flex min-h-[calc(100dvh-92px)] flex-col overflow-hidden lg:min-h-[720px]">
+    <main className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 gap-3 px-3 pb-3 sm:gap-4 sm:px-6 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <section
+        className={`panel flex flex-col overflow-hidden ${
+          state ? "min-h-0" : "self-start lg:min-h-[720px]"
+        }`}
+      >
         <div className="border-b border-[var(--line)] p-4 sm:p-5">
           <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
             {state?.stage?.startsWith("phase2") ? t("phase2") : t("phase1")}
@@ -591,11 +601,11 @@ export function ChatTimeline({
   return (
     <div
       ref={scrollRef}
-      className="h-[360px] overflow-y-auto p-3 sm:h-[520px] sm:p-5 lg:h-[560px]"
+      className="min-h-0 flex-1 overflow-y-auto p-3 sm:h-[520px] sm:flex-none sm:p-5 lg:h-[560px]"
       data-testid="chat-timeline"
     >
       {records.length === 0 ? (
-        <div className="grid h-full min-h-80 place-items-center rounded-lg border border-dashed border-[var(--line)] p-8 text-center">
+        <div className="grid h-full min-h-0 place-items-center rounded-lg border border-dashed border-[var(--line)] p-8 text-center">
           <div>
             <Sparkles className="mx-auto mb-3 text-[var(--accent)]" size={28} />
             <p className="text-sm text-[var(--muted-foreground)]">{t("noActivity")}</p>
@@ -666,16 +676,10 @@ function TimelineItem({
         time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
         body={item.record.claim}
         meta={
-          <>
-            <span className="block font-semibold text-[var(--foreground)]">
-              {t("suspectsLabel")}
-              {name(item.record.suspicionTargetId)}
-            </span>
-            <span className="mt-1 block">
-              {t("suspicionReasonLabel")}
-              {item.record.suspicionReason}
-            </span>
-          </>
+          <span className="block font-semibold text-[var(--foreground)]">
+            {t("suspectsLabel")}
+            {name(item.record.suspicionTargetId)}
+          </span>
         }
       />
     );

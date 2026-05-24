@@ -50,6 +50,7 @@ const baseTimelineState: GameState = {
         speakingStyle: "话比较短。",
         catchphrases: ["说实话"],
         reasoningStyle: "从日常体验切入。",
+        votingBias: "跟风偏差：容易受已经出现的票影响。",
       },
     },
   ],
@@ -146,7 +147,7 @@ describe("GameShell", () => {
       expect(screen.getByText("我脑子里先冒出来的是早上洗漱那一下，挺日常的。")).toBeInTheDocument();
     });
     expect(screen.getByTestId("chat-timeline")).toHaveClass(
-      "h-[360px]",
+      "flex-1",
       "overflow-y-auto",
     );
     expect(screen.getByTestId("mobile-player-tip")).toHaveTextContent("你的词语");
@@ -194,6 +195,6 @@ describe("GameShell", () => {
 
     expect(screen.getByText("我刚才说的是办公桌上很常见的东西，不是临时编的。")).toBeInTheDocument();
     expect(screen.getByText("怀疑：臧浩然")).toBeInTheDocument();
-    expect(screen.getByText("理由：你一阶段投票太快，像是想顺着别人走。")).toBeInTheDocument();
+    expect(screen.queryByText("理由：你一阶段投票太快，像是想顺着别人走。")).not.toBeInTheDocument();
   });
 });
