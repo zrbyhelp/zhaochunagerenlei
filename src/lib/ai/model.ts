@@ -49,11 +49,13 @@ function createClient(traceName: string): { client: FlushableOpenAI; model: stri
 async function completeJson(
   traceName: string,
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  options: { temperature?: number; topP?: number } = {},
 ) {
   const { client, model } = createClient(traceName);
   const completion = await client.chat.completions.create({
     model,
-    temperature: 0.72,
+    temperature: options.temperature ?? 0.72,
+    top_p: options.topP,
     messages,
     response_format: { type: "json_object" },
   });
@@ -62,12 +64,15 @@ async function completeJson(
   return completion.choices[0]?.message.content ?? "";
 }
 
-export async function generateWordPair(locale: Locale): Promise<WordPairOutput> {
-  const prompt = wordPairPrompt(locale);
+export async function generateWordPair(
+  locale: Locale,
+  options: Parameters<typeof wordPairPrompt>[1] = {},
+): Promise<WordPairOutput> {
+  const prompt = wordPairPrompt(locale, options);
   const content = await completeJson("game.word_pair", [
     { role: "system", content: prompt.system },
     { role: "user", content: prompt.user },
-  ]);
+  ], { temperature: 0.98, topP: 0.95 });
 
   return parseModelJson(content, WordPairSchema);
 }

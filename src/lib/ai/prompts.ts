@@ -1,13 +1,21 @@
 import type { AiActionRequest } from "./schemas";
 import type { Locale } from "../game/types";
 
+export type WordPairPromptOptions = {
+  category?: string;
+  seed?: string;
+  avoidPairs?: string[];
+};
+
 function languageInstruction(locale: Locale) {
   return locale === "zh-CN"
     ? "使用简体中文输出。"
     : "Respond in concise English.";
 }
 
-export function wordPairPrompt(locale: Locale) {
+export function wordPairPrompt(locale: Locale, options: WordPairPromptOptions = {}) {
+  const avoidPairs = options.avoidPairs?.filter(Boolean).slice(0, 20) ?? [];
+
   return {
     system: [
       "You design word pairs for the party game Who Is Undercover.",
@@ -16,6 +24,7 @@ export function wordPairPrompt(locale: Locale) {
       "Use everyday categories only: household items, food and drinks, office or school supplies, transport, common jobs, familiar places, movies, TV, anime, game characters, or widely known celebrities/fictional characters.",
       "Do not generate abstract concepts, sci-fi regime words, technical jargon, political slogans, worldbuilding terms, or pairs with a huge semantic gap.",
       "Good examples: toothbrush/toothpaste, coffee/milk tea, keyboard/mouse, refrigerator/washing machine, Sun Wukong/Zhu Bajie.",
+      "The examples are only examples of difficulty and closeness. Do not copy them unless explicitly requested.",
       "Bad examples: future AI regime/human resistance, quantum engine/water cup, justice/coffee.",
       languageInstruction(locale),
     ].join("\n"),
@@ -23,10 +32,17 @@ export function wordPairPrompt(locale: Locale) {
       "Generate one word pair for Who Is Undercover.",
       "JSON shape:",
       "{\"commonWord\":\"...\",\"undercoverWord\":\"...\",\"category\":\"...\",\"sceneIntro\":\"...\"}",
+      options.seed ? `Variety seed for this round: ${options.seed}. Use it to avoid repeating obvious default answers; do not mention it.` : "",
+      options.category ? `Required category for this round: ${options.category}.` : "",
+      avoidPairs.length > 0
+        ? `Recently used or blocked pairs: ${avoidPairs.join("; ")}. Do not generate these pairs, their reversed forms, or pairs that are nearly identical to them.`
+        : "",
       "Keep commonWord and undercoverWord short, familiar, same broad category, and easy for normal players to describe.",
       "The category should be plain, such as 生活物品, 食物饮品, 办公用品, 影视动漫人物, 交通工具, or 日常地点.",
       "sceneIntro should be natural and not reveal either word.",
-    ].join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
   };
 }
 
@@ -58,9 +74,12 @@ export function actionPrompt(request: AiActionRequest) {
           "You only know your own word, not your hidden identity.",
           "You must guess what the likely real majority word is from public speeches.",
           "If your own word may be the different word, speak more carefully and leave room.",
-          "Use one short natural paragraph.",
-          "Mention a concrete everyday scene, feeling, use, or association.",
-          "Leave some ambiguity so others can still guess.",
+          "Act like you are a little worried you might be the undercover: do not be too confident.",
+          "Use one or two short casual sentences, under 70 Chinese characters or 45 English words when possible.",
+          "Give only one low-risk clue: a vague everyday scene, broad feeling, or loose association.",
+          "Avoid highly specific uses, unique details, brand names, titles, character catchphrases, exact shapes, exact materials, or anything that would basically identify the word.",
+          "If you speak early or public context is thin, be especially fuzzy.",
+          "Leave real ambiguity so others cannot immediately pin down your exact word.",
           "Do not reveal the word or use near-identical wording.",
         ],
         outputShape: { speech: "string" },

@@ -106,6 +106,10 @@ describe("GameShell", () => {
 
     expect(input).toHaveValue("臧浩然");
     expect(screen.getByText("成员数量")).toBeInTheDocument();
+    expect(screen.getByTestId("member-count-picker")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "4人" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "10人" })).toBeInTheDocument();
+    expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
   it("auto-generates AI speech and keeps the player composer in the chat layout", async () => {
@@ -142,9 +146,11 @@ describe("GameShell", () => {
       expect(screen.getByText("我脑子里先冒出来的是早上洗漱那一下，挺日常的。")).toBeInTheDocument();
     });
     expect(screen.getByTestId("chat-timeline")).toHaveClass(
-      "h-[460px]",
+      "h-[360px]",
       "overflow-y-auto",
     );
+    expect(screen.getByTestId("mobile-player-tip")).toHaveTextContent("你的词语");
+    expect(screen.getByTestId("mobile-player-tip")).toHaveTextContent("第 1 轮");
     expect(screen.queryByText("你的身份")).not.toBeInTheDocument();
     expect(screen.queryByText("普通阵营")).not.toBeInTheDocument();
     expect(screen.queryByText("卧底阵营")).not.toBeInTheDocument();

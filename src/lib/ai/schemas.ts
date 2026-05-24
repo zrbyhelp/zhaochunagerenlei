@@ -35,7 +35,7 @@ export const AiActionRequestSchema = z.object({
 });
 
 export const Phase1SpeechSchema = z.object({
-  speech: z.string().min(4).max(220),
+  speech: z.string().min(4).max(160),
 });
 
 export const Phase1VoteSchema = z

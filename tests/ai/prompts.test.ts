@@ -3,13 +3,22 @@ import { actionPrompt, wordPairPrompt } from "@/lib/ai/prompts";
 
 describe("AI prompts", () => {
   it("constrains word pairs to common close game words", () => {
-    const prompt = wordPairPrompt("zh-CN");
+    const prompt = wordPairPrompt("zh-CN", {
+      category: "食物饮品",
+      seed: "test-seed-42",
+      avoidPairs: ["牙刷 / 牙膏"],
+    });
     const joined = `${prompt.system}\n${prompt.user}`;
 
     expect(joined).toContain("household items");
     expect(joined).toContain("toothbrush/toothpaste");
+    expect(joined).toContain("Do not copy them");
     expect(joined).toContain("Do not generate abstract concepts");
     expect(joined).toContain("same broad category");
+    expect(joined).toContain("test-seed-42");
+    expect(joined).toContain("Required category for this round: 食物饮品");
+    expect(joined).toContain("牙刷 / 牙膏");
+    expect(joined).toContain("Do not generate these pairs");
   });
 
   it("passes persona into action prompts for human-like speech", () => {
@@ -34,6 +43,9 @@ describe("AI prompts", () => {
     expect(prompt.system).toContain("轻松吐槽型");
     expect(prompt.system).toContain("Speak naturally");
     expect(prompt.user).toContain("real player");
+    expect(prompt.user).toContain("worried you might be the undercover");
+    expect(prompt.user).toContain("Give only one low-risk clue");
+    expect(prompt.user).toContain("Avoid highly specific uses");
   });
 
   it("tells phase-one AI players to reason cautiously without knowing identity", () => {

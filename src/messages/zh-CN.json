@@ -18,6 +18,7 @@
     "playerName": "玩家名称",
     "playerNamePlaceholder": "输入你的代号",
     "memberCount": "成员数量",
+    "memberCountOption": "{count}人",
     "start": "启动审查",
     "starting": "正在生成词语",
     "configMissing": "模型配置缺失，请先设置 OPENAI_API_KEY 和 OPENAI_MODEL。",

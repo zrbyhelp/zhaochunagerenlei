@@ -68,6 +68,9 @@ describe("navigation and admin", () => {
       "href",
       "https://github.com/zrbyhelp/zhaochunagerenlei",
     );
+    expect(screen.getByLabelText("后台")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "语言" })).toBeInTheDocument();
+    expect(screen.queryByText("后台")).not.toBeInTheDocument();
   });
 
   it("keeps admin focused on preferences without model configuration details", () => {

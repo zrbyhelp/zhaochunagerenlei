@@ -4,7 +4,6 @@ import { Languages, Settings } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { Link, type AppLocale, routing } from "@/i18n/routing";
-import { Button } from "@/components/ui/button";
 
 const githubUrl = "https://github.com/zrbyhelp/zhaochunagerenlei";
 
@@ -30,10 +29,10 @@ export function TopBar() {
   }
 
   return (
-    <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+    <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
       <Link
         href="/"
-        className="max-w-[52vw] truncate text-sm font-semibold text-[var(--accent)]"
+        className="max-w-[58vw] truncate text-sm font-semibold text-[var(--accent)]"
       >
         {meta("title")}
       </Link>
@@ -48,17 +47,22 @@ export function TopBar() {
         >
           <GitHubMark />
         </a>
-        <Link href="/admin">
-          <Button type="button" variant="secondary" size="sm" title={t("admin")}>
-            <Settings size={16} />
-            {t("admin")}
-          </Button>
+        <Link
+          aria-label={t("admin")}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--panel-strong)]"
+          href="/admin"
+          title={t("admin")}
+        >
+          <Settings size={16} />
         </Link>
-        <label className="inline-flex h-8 items-center gap-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 text-xs font-semibold">
+        <label
+          className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--line)] bg-[var(--panel)] text-[var(--foreground)] transition hover:bg-[var(--panel-strong)]"
+          title={t("language")}
+        >
           <Languages size={14} />
-          <span className="sr-only">{t("language")}</span>
           <select
-            className="bg-transparent text-[var(--foreground)] outline-none"
+            aria-label={t("language")}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
             value={locale}
             onChange={(event) =>
               switchLocale(event.target.value as AppLocale)

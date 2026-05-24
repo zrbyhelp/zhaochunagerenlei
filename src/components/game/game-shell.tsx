@@ -348,14 +348,14 @@ export function GameShell() {
   }
 
   return (
-    <main className="mx-auto grid w-full max-w-7xl gap-4 px-4 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="panel flex min-h-[720px] flex-col overflow-hidden">
-        <div className="border-b border-[var(--line)] p-5">
+    <main className="mx-auto grid w-full max-w-7xl gap-3 px-3 pb-5 sm:gap-4 sm:px-6 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="panel flex min-h-[calc(100dvh-92px)] flex-col overflow-hidden lg:min-h-[720px]">
+        <div className="border-b border-[var(--line)] p-4 sm:p-5">
           <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
             {state?.stage?.startsWith("phase2") ? t("phase2") : t("phase1")}
           </p>
-          <h1 className="text-3xl font-semibold text-balance">{t("title")}</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
+          <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{t("title")}</h1>
+          <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted-foreground)] sm:mt-3 sm:text-sm sm:leading-6">
             {t("subtitle")}
           </p>
         </div>
@@ -371,13 +371,14 @@ export function GameShell() {
           />
         ) : (
           <>
+            <MobilePlayerTip state={state} />
             <ChatTimeline
               state={state}
               currentSpeaker={currentSpeaker}
               loading={loading}
               dateLocale={dateLocale}
             />
-            <div className="border-t border-[var(--line)] bg-[var(--panel-strong)] p-4">
+            <div className="border-t border-[var(--line)] bg-[var(--panel-strong)] p-3 sm:p-4">
               {state.stage === "phase1_speech" && currentSpeaker ? (
                 currentSpeaker.id === PLAYER_ID ? (
                   <SpeechComposer
@@ -433,7 +434,7 @@ export function GameShell() {
         )}
       </section>
 
-      <aside className="grid content-start gap-4">
+      <aside className="hidden content-start gap-4 lg:grid">
         {state ? (
           <>
             <PlayerSecret state={state} />
@@ -472,9 +473,10 @@ function SetupPanel({
   onStart: () => void;
 }) {
   const t = useTranslations("game");
+  const countOptions = [4, 5, 6, 7, 8, 9, 10];
 
   return (
-    <div className="grid max-w-xl gap-4 p-5">
+    <div className="grid max-w-xl gap-4 p-4 sm:p-5">
       <h2 className="text-xl font-semibold">{t("setupTitle")}</h2>
       <label className="grid gap-2 text-sm">
         <span className="text-[var(--muted-foreground)]">{t("playerName")}</span>
@@ -485,17 +487,26 @@ function SetupPanel({
           placeholder={t("playerNamePlaceholder")}
         />
       </label>
-      <label className="grid gap-2 text-sm">
-        <span className="text-[var(--muted-foreground)]">{t("memberCount")}</span>
-        <input
-          className="field"
-          min={4}
-          max={10}
-          type="number"
-          value={playerCount}
-          onChange={(event) => onCountChange(Number(event.target.value))}
-        />
-      </label>
+      <fieldset className="grid gap-2 text-sm">
+        <legend className="text-[var(--muted-foreground)]">{t("memberCount")}</legend>
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7" data-testid="member-count-picker">
+          {countOptions.map((count) => (
+            <button
+              aria-pressed={playerCount === count}
+              className={`h-10 rounded-lg border text-sm font-semibold transition ${
+                playerCount === count
+                  ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                  : "border-[var(--line)] bg-[var(--panel-strong)] text-[var(--foreground)] hover:bg-[var(--panel)]"
+              }`}
+              key={count}
+              onClick={() => onCountChange(count)}
+              type="button"
+            >
+              {t("memberCountOption", { count })}
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <Button type="button" disabled={loading} onClick={onStart}>
         {loading ? <Loader2 className="animate-spin" size={16} /> : <ShieldQuestion size={16} />}
         {loading ? t("starting") : t("start")}
@@ -514,6 +525,37 @@ function PlayerSecret({ state }: { state: GameState }) {
     <section className="panel grid gap-3 p-4">
       <Info label={t("yourWord")} value={player.word} />
       <Info label={t("round", { round: state.phase1Round })} value={t("inProgress")} />
+    </section>
+  );
+}
+
+function MobilePlayerTip({ state }: { state: GameState }) {
+  const t = useTranslations("game");
+  const player = state.participants.find((participant) => participant.id === PLAYER_ID);
+
+  if (!player) return null;
+
+  return (
+    <section
+      className="grid grid-cols-2 gap-2 border-b border-[var(--line)] bg-[var(--panel-strong)] p-3 lg:hidden"
+      data-testid="mobile-player-tip"
+    >
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2">
+        <span className="block text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">
+          {t("yourWord")}
+        </span>
+        <strong className="mt-0.5 block truncate text-base text-[var(--foreground)]">
+          {player.word}
+        </strong>
+      </div>
+      <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2">
+        <span className="block text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">
+          {t("round", { round: state.phase1Round })}
+        </span>
+        <strong className="mt-0.5 block truncate text-base text-[var(--foreground)]">
+          {t("inProgress")}
+        </strong>
+      </div>
     </section>
   );
 }
@@ -549,7 +591,7 @@ export function ChatTimeline({
   return (
     <div
       ref={scrollRef}
-      className="h-[460px] overflow-y-auto p-5 sm:h-[520px] lg:h-[560px]"
+      className="h-[360px] overflow-y-auto p-3 sm:h-[520px] sm:p-5 lg:h-[560px]"
       data-testid="chat-timeline"
     >
       {records.length === 0 ? (

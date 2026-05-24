@@ -18,6 +18,7 @@
     "playerName": "Player name",
     "playerNamePlaceholder": "Enter your call sign",
     "memberCount": "Member count",
+    "memberCountOption": "{count}P",
     "start": "Start audit",
     "starting": "Generating words",
     "configMissing": "Model configuration is missing. Set OPENAI_API_KEY and OPENAI_MODEL first.",
