@@ -59,6 +59,7 @@ export type VoteRecord = {
 
 export type EliminationRecord = {
   id: string;
+  phase: "phase1" | "phase2";
   round: number;
   eliminatedId: string;
   tiedIds: string[];
@@ -66,8 +67,18 @@ export type EliminationRecord = {
   createdAt: string;
 };
 
+export type TieRecord = {
+  id: string;
+  phase: "phase1" | "phase2";
+  round: number;
+  tiedIds: string[];
+  reason: string;
+  createdAt: string;
+};
+
 export type Phase2Statement = {
   id: string;
+  round: number;
   speakerId: string;
   claim: string;
   suspicionTargetId: string;
@@ -93,10 +104,12 @@ export type GameState = {
   speakingOrder: string[];
   currentSpeakerIndex: number;
   phase1Round: number;
+  phase2Round: number;
   stage: GameStage;
   speeches: SpeechRecord[];
   phase1Votes: VoteRecord[];
   eliminations: EliminationRecord[];
+  tieRecords: TieRecord[];
   phase2Statements: Phase2Statement[];
   phase2Votes: VoteRecord[];
   result: GameResult | null;
@@ -120,4 +133,5 @@ export type Phase2Context = {
   speeches: SpeechRecord[];
   phase1Votes: VoteRecord[];
   eliminations: EliminationRecord[];
+  tieRecords: TieRecord[];
 };

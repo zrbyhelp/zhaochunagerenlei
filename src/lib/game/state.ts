@@ -8,6 +8,7 @@ import type {
   Phase2Statement,
   RandomSource,
   SpeechRecord,
+  TieRecord,
   VoteRecord,
 } from "./types";
 
@@ -113,10 +114,12 @@ export function createGame(input: CreateGameInput): GameState {
     speakingOrder: shuffle(participantIds, rng),
     currentSpeakerIndex: 0,
     phase1Round: 1,
+    phase2Round: 1,
     stage: "phase1_speech",
     speeches: [],
     phase1Votes: [],
     eliminations: [],
+    tieRecords: [],
     phase2Statements: [],
     phase2Votes: [],
     result: null,
@@ -189,9 +192,35 @@ export function recordPhase1Votes(
   if (leaders.length === 0) {
     throw new Error("NO_VALID_VOTES");
   }
-  const eliminatedId = pickOne(leaders, rng);
+  const baseWithVotes: GameState = {
+    ...state,
+    phase1Votes: [...state.phase1Votes, ...phaseVotes],
+    updatedAt: timestamp,
+  };
+
+  if (leaders.length > 1) {
+    const tieRecord: TieRecord = {
+      id: createId("tie", rng),
+      phase: "phase1",
+      round: state.phase1Round,
+      tiedIds: leaders,
+      reason: "Top vote count was tied; no one was eliminated.",
+      createdAt: timestamp,
+    };
+
+    return restartPhase1Round(
+      {
+        ...baseWithVotes,
+        tieRecords: [...baseWithVotes.tieRecords, tieRecord],
+      },
+      rng,
+    );
+  }
+
+  const eliminatedId = leaders[0];
   const elimination: EliminationRecord = {
     id: createId("elim", rng),
+    phase: "phase1",
     round: state.phase1Round,
     eliminatedId,
     tiedIds: leaders,
@@ -204,20 +233,15 @@ export function recordPhase1Votes(
       : participant,
   );
   const nextBase: GameState = {
-    ...state,
+    ...baseWithVotes,
     participants,
-    phase1Votes: [...state.phase1Votes, ...phaseVotes],
-    eliminations: [...state.eliminations, elimination],
+    eliminations: [...baseWithVotes.eliminations, elimination],
     updatedAt: timestamp,
   };
   const player = nextBase.participants.find((participant) => participant.id === PLAYER_ID);
   const undercover = nextBase.participants.find(
     (participant) => participant.id === nextBase.undercoverId,
   );
-  const nonUndercoverActive = nextBase.participants.filter(
-    (participant) => participant.active && participant.role === "civilian",
-  ).length;
-
   if (!player?.active) {
     return finishGame(nextBase, "phase1_player_lost", ["phase1Lose"], leaders);
   }
@@ -226,7 +250,7 @@ export function recordPhase1Votes(
     return startPhase2(nextBase, rng);
   }
 
-  if (undercover.active && nonUndercoverActive <= 1) {
+  if (undercover.active && activeParticipants(nextBase).length <= 2) {
     return player.role === "undercover"
       ? startPhase2(nextBase, rng)
       : finishGame(nextBase, "phase1_player_lost", ["phase1Lose"], leaders);
@@ -260,6 +284,33 @@ function startPhase2(state: GameState, rng: RandomSource): GameState {
     ...state,
     speakingOrder: order,
     currentSpeakerIndex: 0,
+    phase2Round: state.phase2Round || 1,
+    stage: "phase2_defense",
+  };
+}
+
+function restartPhase1Round(state: GameState, rng: RandomSource): GameState {
+  return {
+    ...state,
+    speakingOrder: shuffle(
+      activeParticipants(state).map((participant) => participant.id),
+      rng,
+    ),
+    currentSpeakerIndex: 0,
+    phase1Round: state.phase1Round + 1,
+    stage: "phase1_speech",
+  };
+}
+
+function restartPhase2Round(state: GameState, rng: RandomSource): GameState {
+  return {
+    ...state,
+    speakingOrder: shuffle(
+      activeParticipants(state).map((participant) => participant.id),
+      rng,
+    ),
+    currentSpeakerIndex: 0,
+    phase2Round: state.phase2Round + 1,
     stage: "phase2_defense",
   };
 }
@@ -284,7 +335,7 @@ function finishGame(
 
 export function recordPhase2Statement(
   state: GameState,
-  statement: Omit<Phase2Statement, "id" | "createdAt">,
+  statement: Omit<Phase2Statement, "id" | "round" | "createdAt">,
   now?: string,
   rng: RandomSource = Math.random,
 ): GameState {
@@ -301,6 +352,7 @@ export function recordPhase2Statement(
   const record: Phase2Statement = {
     ...statement,
     id: createId("defense", rng),
+    round: state.phase2Round,
     createdAt: timestamp,
   };
   const isRoundDone = state.currentSpeakerIndex >= state.speakingOrder.length - 1;
@@ -332,25 +384,70 @@ export function recordPhase2Votes(
       ...vote,
       id: createId("vote", rng),
       phase: "phase2",
-      round: 1,
+      round: state.phase2Round,
       createdAt: timestamp,
     }));
   const leaders = voteLeaders(phaseVotes);
   if (leaders.length === 0) {
     throw new Error("NO_VALID_VOTES");
   }
-  const playerLost = leaders.includes(PLAYER_ID);
+  const baseWithVotes: GameState = {
+    ...state,
+    phase2Votes: [...state.phase2Votes, ...phaseVotes],
+    updatedAt: timestamp,
+  };
 
-  return finishGame(
-    {
-      ...state,
-      phase2Votes: [...state.phase2Votes, ...phaseVotes],
-      updatedAt: timestamp,
-    },
-    playerLost ? "phase2_player_lost" : "phase2_player_won",
-    playerLost ? ["phase2Lose"] : ["phase2Win"],
-    leaders,
+  if (leaders.length > 1) {
+    const tieRecord: TieRecord = {
+      id: createId("tie", rng),
+      phase: "phase2",
+      round: state.phase2Round,
+      tiedIds: leaders,
+      reason: "Top vote count was tied; no one was eliminated.",
+      createdAt: timestamp,
+    };
+
+    return restartPhase2Round(
+      {
+        ...baseWithVotes,
+        tieRecords: [...baseWithVotes.tieRecords, tieRecord],
+      },
+      rng,
+    );
+  }
+
+  const eliminatedId = leaders[0];
+  const elimination: EliminationRecord = {
+    id: createId("elim", rng),
+    phase: "phase2",
+    round: state.phase2Round,
+    eliminatedId,
+    tiedIds: leaders,
+    reason: `${participantName(state, eliminatedId)} received the top vote count.`,
+    createdAt: timestamp,
+  };
+  const participants = state.participants.map((participant) =>
+    participant.id === eliminatedId
+      ? { ...participant, active: false }
+      : participant,
   );
+  const nextBase: GameState = {
+    ...baseWithVotes,
+    participants,
+    eliminations: [...baseWithVotes.eliminations, elimination],
+    updatedAt: timestamp,
+  };
+  const player = nextBase.participants.find((participant) => participant.id === PLAYER_ID);
+
+  if (!player?.active) {
+    return finishGame(nextBase, "phase2_player_lost", ["phase2Lose"], leaders);
+  }
+
+  if (activeParticipants(nextBase).length <= 2) {
+    return finishGame(nextBase, "phase2_player_won", ["phase2Win"], leaders);
+  }
+
+  return restartPhase2Round(nextBase, rng);
 }
 
 export function buildPhase2Context(state: GameState): Phase2Context {
@@ -363,6 +460,7 @@ export function buildPhase2Context(state: GameState): Phase2Context {
     speeches: state.speeches,
     phase1Votes: state.phase1Votes,
     eliminations: state.eliminations,
+    tieRecords: state.tieRecords,
   };
 }
 

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { enUS, zhCN, type Locale as DateFnsLocale } from "date-fns/locale";
 import {
   Bot,
+  ArrowRight,
   Loader2,
   RefreshCcw,
   Send,
@@ -44,6 +45,7 @@ import type {
 
 type ApiResult<T> = { result: T };
 type WordPairResult = { wordPair: WordPair };
+type Phase1Summary = { kind: "phase2Ready" | "phase1Lost" };
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, {
@@ -111,6 +113,7 @@ export function GameShell() {
   const [defenseText, setDefenseText] = useState("");
   const [selectedTarget, setSelectedTarget] = useState("");
   const [loading, setLoading] = useState(false);
+  const [phase1Summary, setPhase1Summary] = useState<Phase1Summary | null>(null);
   const autoActionKeyRef = useRef("");
 
   const player = state?.participants.find((participant) => participant.id === PLAYER_ID);
@@ -172,6 +175,7 @@ export function GameShell() {
           actor: actorPayload(speaker),
           candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
           context: {
+            phase2Round: stateSnapshot.phase2Round,
             phaseOne: buildPhase2Context(stateSnapshot),
             previousPhaseTwoStatements: stateSnapshot.phase2Statements,
           },
@@ -195,7 +199,7 @@ export function GameShell() {
   );
 
   useEffect(() => {
-    if (!state || loading) return;
+    if (!state || loading || phase1Summary) return;
 
     const speaker = getCurrentSpeaker(state);
     if (!speaker || speaker.kind !== "ai") return;
@@ -208,12 +212,12 @@ export function GameShell() {
     }
 
     if (state.stage === "phase2_defense") {
-      const key = `${state.id}:phase2:${state.currentSpeakerIndex}:${speaker.id}:${state.phase2Statements.length}`;
+      const key = `${state.id}:phase2:${state.phase2Round}:${state.currentSpeakerIndex}:${speaker.id}:${state.phase2Statements.length}`;
       if (autoActionKeyRef.current === key) return;
       autoActionKeyRef.current = key;
       void runAiDefenseFor(state, speaker);
     }
-  }, [loading, runAiDefenseFor, runAiSpeechFor, state]);
+  }, [loading, phase1Summary, runAiDefenseFor, runAiSpeechFor, state]);
 
   async function startGame() {
     if (!playerName.trim()) {
@@ -234,6 +238,7 @@ export function GameShell() {
       });
       autoActionKeyRef.current = "";
       setState(next);
+      setPhase1Summary(null);
       setSelectedTarget("");
       setSpeechText("");
       setDefenseText("");
@@ -247,9 +252,15 @@ export function GameShell() {
   function resetGame() {
     autoActionKeyRef.current = "";
     setState(null);
+    setPhase1Summary(null);
     setSpeechText("");
     setDefenseText("");
     setSelectedTarget("");
+  }
+
+  function continueToPhase2() {
+    autoActionKeyRef.current = "";
+    setPhase1Summary(null);
   }
 
   function submitPlayerSpeech() {
@@ -298,7 +309,15 @@ export function GameShell() {
       }
 
       autoActionKeyRef.current = "";
-      setState(recordPhase1Votes(state, votes));
+      const next = recordPhase1Votes(state, votes);
+      setState(next);
+      if (next.stage === "phase2_defense") {
+        setPhase1Summary({ kind: "phase2Ready" });
+      } else if (next.stage === "final" && next.result?.outcome === "phase1_player_lost") {
+        setPhase1Summary({ kind: "phase1Lost" });
+      } else {
+        setPhase1Summary(null);
+      }
       setSelectedTarget("");
     } catch (error) {
       showModelError(error);
@@ -348,6 +367,7 @@ export function GameShell() {
           actor: actorPayload(actor),
           candidates: candidatePayload(getVoteCandidates(state, actor.id)),
           context: {
+            phase2Round: state.phase2Round,
             phaseOne: buildPhase2Context(state),
             phaseTwoStatements: state.phase2Statements,
             currentVotes: votePayload(votes),
@@ -360,6 +380,7 @@ export function GameShell() {
         });
       }
 
+      autoActionKeyRef.current = "";
       setState(recordPhase2Votes(state, votes));
       setSelectedTarget("");
     } catch (error) {
@@ -370,116 +391,186 @@ export function GameShell() {
   }
 
   return (
-    <main className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 gap-3 px-3 pb-3 sm:gap-4 sm:px-6 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section
-        className={`panel flex flex-col overflow-hidden ${
-          state ? "min-h-0" : "self-start lg:min-h-[720px]"
-        }`}
-      >
-        <div className="border-b border-[var(--line)] p-4 sm:p-5">
-          <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
-            {isPhaseTwoView(state) ? t("phase2") : t("phase1")}
-          </p>
-          <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{t("title")}</h1>
-          <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted-foreground)] sm:mt-3 sm:text-sm sm:leading-6">
-            {t("subtitle")}
-          </p>
-        </div>
-
-        {!state ? (
-          <SetupPanel
-            playerName={playerName}
-            playerCount={playerCount}
-            loading={loading}
-            onNameChange={setPlayerName}
-            onCountChange={setPlayerCount}
-            onStart={startGame}
-          />
-        ) : (
-          <>
-            <MobilePlayerTip state={state} />
-            <ChatTimeline
-              state={state}
-              currentSpeaker={currentSpeaker}
-              loading={loading}
-              dateLocale={dateLocale}
-            />
-            <div className="border-t border-[var(--line)] bg-[var(--panel-strong)] p-3 sm:p-4">
-              {state.stage === "phase1_speech" && currentSpeaker ? (
-                currentSpeaker.id === PLAYER_ID ? (
-                  <SpeechComposer
-                    text={speechText}
-                    onTextChange={setSpeechText}
-                    onSubmit={submitPlayerSpeech}
-                  />
-                ) : (
-                  <TypingStatus speaker={currentSpeaker} loading={loading} />
-                )
-              ) : null}
-              {state.stage === "phase1_vote" ? (
-                <VotePanel
-                  title={t("phase1VoteTitle")}
-                  help={t("phase1VoteHelp")}
-                  candidates={getVoteCandidates(state, PLAYER_ID)}
-                  selectedTarget={selectedTarget}
-                  loading={loading}
-                  onSelect={setSelectedTarget}
-                  onComplete={completePhase1Vote}
-                />
-              ) : null}
-              {state.stage === "phase2_defense" && currentSpeaker ? (
-                currentSpeaker.id === PLAYER_ID ? (
-                  <DefenseComposer
-                    candidates={voteCandidates}
-                    text={defenseText}
-                    selectedTarget={selectedTarget}
-                    onTextChange={setDefenseText}
-                    onSelect={setSelectedTarget}
-                    onSubmit={submitPlayerDefense}
-                  />
-                ) : (
-                  <TypingStatus speaker={currentSpeaker} loading={loading} />
-                )
-              ) : null}
-              {state.stage === "phase2_vote" ? (
-                <VotePanel
-                  title={t("phase2VoteTitle")}
-                  help={t("phase2VoteHelp")}
-                  candidates={getVoteCandidates(state, PLAYER_ID)}
-                  selectedTarget={selectedTarget}
-                  loading={loading}
-                  onSelect={setSelectedTarget}
-                  onComplete={completePhase2Vote}
-                />
-              ) : null}
-              {state.stage === "final" ? (
-                <ResultPanel state={state} onRestart={resetGame} />
-              ) : null}
-            </div>
-          </>
-        )}
-      </section>
-
-      <aside className="hidden content-start gap-4 lg:grid">
-        {state ? (
-          <>
-            <PlayerSecret state={state} />
-            <ParticipantsPanel state={state} />
-            <StageHint state={state} />
-          </>
-        ) : (
-          <div className="panel p-5">
-            <div className="scan-line mb-4" />
-            <p className="text-sm leading-6 text-[var(--muted-foreground)]">
-              {t("hiddenForPlayer")}
+    <>
+      <main className="mx-auto grid min-h-0 w-full max-w-7xl flex-1 gap-3 px-3 pb-3 sm:gap-4 sm:px-6 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section
+          className={`panel flex flex-col overflow-hidden ${
+            state ? "min-h-0" : "self-start lg:min-h-[720px]"
+          }`}
+        >
+          <div className="border-b border-[var(--line)] p-4 sm:p-5">
+            <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
+              {isPhaseTwoView(state) ? t("phase2") : t("phase1")}
             </p>
-            <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
-              {t("aiNameNote")}
+            <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{t("title")}</h1>
+            <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted-foreground)] sm:mt-3 sm:text-sm sm:leading-6">
+              {t("subtitle")}
             </p>
           </div>
-        )}
-      </aside>
-    </main>
+
+          {!state ? (
+            <SetupPanel
+              playerName={playerName}
+              playerCount={playerCount}
+              loading={loading}
+              onNameChange={setPlayerName}
+              onCountChange={setPlayerCount}
+              onStart={startGame}
+            />
+          ) : (
+            <>
+              <MobilePlayerTip state={state} />
+              <ChatTimeline
+                state={state}
+                currentSpeaker={currentSpeaker}
+                loading={loading}
+                dateLocale={dateLocale}
+              />
+              <div className="border-t border-[var(--line)] bg-[var(--panel-strong)] p-3 sm:p-4">
+                {state.stage === "phase1_speech" && currentSpeaker ? (
+                  currentSpeaker.id === PLAYER_ID ? (
+                    <SpeechComposer
+                      text={speechText}
+                      onTextChange={setSpeechText}
+                      onSubmit={submitPlayerSpeech}
+                    />
+                  ) : (
+                    <TypingStatus speaker={currentSpeaker} loading={loading} />
+                  )
+                ) : null}
+                {state.stage === "phase1_vote" ? (
+                  <VotePanel
+                    title={t("phase1VoteTitle")}
+                    help={t("phase1VoteHelp")}
+                    candidates={getVoteCandidates(state, PLAYER_ID)}
+                    selectedTarget={selectedTarget}
+                    loading={loading}
+                    onSelect={setSelectedTarget}
+                    onComplete={completePhase1Vote}
+                  />
+                ) : null}
+                {state.stage === "phase2_defense" && currentSpeaker ? (
+                  currentSpeaker.id === PLAYER_ID ? (
+                    <DefenseComposer
+                      candidates={voteCandidates}
+                      text={defenseText}
+                      selectedTarget={selectedTarget}
+                      onTextChange={setDefenseText}
+                      onSelect={setSelectedTarget}
+                      onSubmit={submitPlayerDefense}
+                    />
+                  ) : (
+                    <TypingStatus speaker={currentSpeaker} loading={loading} />
+                  )
+                ) : null}
+                {state.stage === "phase2_vote" ? (
+                  <VotePanel
+                    title={t("phase2VoteTitle")}
+                    help={t("phase2VoteHelp")}
+                    candidates={getVoteCandidates(state, PLAYER_ID)}
+                    selectedTarget={selectedTarget}
+                    loading={loading}
+                    onSelect={setSelectedTarget}
+                    onComplete={completePhase2Vote}
+                  />
+                ) : null}
+                {state.stage === "final" ? (
+                  <ResultPanel state={state} onRestart={resetGame} />
+                ) : null}
+              </div>
+            </>
+          )}
+        </section>
+
+        <aside className="hidden content-start gap-4 lg:grid">
+          {state ? (
+            <>
+              <PlayerSecret state={state} />
+              <ParticipantsPanel state={state} />
+              <StageHint state={state} />
+            </>
+          ) : (
+            <div className="panel p-5">
+              <div className="scan-line mb-4" />
+              <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+                {t("hiddenForPlayer")}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
+                {t("aiNameNote")}
+              </p>
+            </div>
+          )}
+        </aside>
+      </main>
+      {state && phase1Summary ? (
+        <Phase1SummaryModal
+          state={state}
+          summary={phase1Summary}
+          onContinue={continueToPhase2}
+          onRestart={resetGame}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function Phase1SummaryModal({
+  state,
+  summary,
+  onContinue,
+  onRestart,
+}: {
+  state: GameState;
+  summary: Phase1Summary;
+  onContinue: () => void;
+  onRestart: () => void;
+}) {
+  const t = useTranslations("game");
+  const isReady = summary.kind === "phase2Ready";
+  const latestElimination = state.eliminations.at(-1);
+  const eliminatedName = latestElimination
+    ? state.participants.find((participant) => participant.id === latestElimination.eliminatedId)?.name
+    : null;
+
+  return (
+    <div
+      aria-labelledby="phase1-summary-title"
+      aria-modal="true"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/55 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+    >
+      <section className="panel w-full max-w-lg overflow-hidden shadow-2xl">
+        <div className="border-b border-[var(--line)] bg-[var(--panel-strong)] p-5">
+          <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
+            {t("phase1")}
+          </p>
+          <h2 className="text-2xl font-semibold" id="phase1-summary-title">
+            {t("phase1SummaryTitle")}
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
+            {isReady ? t("phase1SummaryWin") : t("phase1SummaryLose")}
+          </p>
+        </div>
+        <div className="grid gap-3 p-5">
+          <Info label={t("commonWord")} value={state.wordPair.commonWord} />
+          <Info label={t("undercoverWord")} value={state.wordPair.undercoverWord} />
+          <Info label={t("phase1Eliminated")} value={eliminatedName ?? t("eliminated")} />
+        </div>
+        <div className="flex flex-col-reverse gap-3 border-t border-[var(--line)] bg-[var(--panel-strong)] p-4 sm:flex-row sm:justify-end">
+          {isReady ? (
+            <Button type="button" onClick={onContinue}>
+              <ArrowRight size={16} />
+              {t("enterPhase2")}
+            </Button>
+          ) : (
+            <Button type="button" variant="secondary" onClick={onRestart}>
+              <RefreshCcw size={16} />
+              {t("restart")}
+            </Button>
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -548,7 +639,10 @@ function PlayerSecret({ state }: { state: GameState }) {
   if (!player) return null;
 
   const phaseLabel = isPhaseTwoView(state) ? t("phase2") : t("phase1");
-  const progressLabel = state.stage === "final" ? phaseLabel : t("round", { round: state.phase1Round });
+  const roundLabel = isPhaseTwoView(state)
+    ? t("phase2Round", { round: state.phase2Round })
+    : t("round", { round: state.phase1Round });
+  const progressLabel = state.stage === "final" ? phaseLabel : roundLabel;
   const progressValue =
     state.stage === "final" && state.result
       ? t(state.result.messageKey)
@@ -569,7 +663,10 @@ function MobilePlayerTip({ state }: { state: GameState }) {
   if (!player) return null;
 
   const phaseLabel = isPhaseTwoView(state) ? t("phase2") : t("phase1");
-  const progressLabel = state.stage === "final" ? phaseLabel : t("round", { round: state.phase1Round });
+  const roundLabel = isPhaseTwoView(state)
+    ? t("phase2Round", { round: state.phase2Round })
+    : t("round", { round: state.phase1Round });
+  const progressLabel = state.stage === "final" ? phaseLabel : roundLabel;
   const progressValue =
     state.stage === "final" && state.result
       ? t(state.result.messageKey)
@@ -667,6 +764,7 @@ function buildTimelineRecords(state: GameState) {
     ...state.speeches.map((record) => ({ type: "speech" as const, createdAt: record.createdAt, record })),
     ...state.phase2Statements.map((record) => ({ type: "defense" as const, createdAt: record.createdAt, record })),
     ...state.eliminations.map((record) => ({ type: "elimination" as const, createdAt: record.createdAt, record })),
+    ...state.tieRecords.map((record) => ({ type: "tie" as const, createdAt: record.createdAt, record })),
     ...state.phase1Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
     ...state.phase2Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -682,6 +780,7 @@ function TimelineItem({
     | { type: "speech"; createdAt: string; record: GameState["speeches"][number] }
     | { type: "defense"; createdAt: string; record: Phase2Statement }
     | { type: "elimination"; createdAt: string; record: GameState["eliminations"][number] }
+    | { type: "tie"; createdAt: string; record: GameState["tieRecords"][number] }
     | { type: "vote"; createdAt: string; record: VoteRecord };
   dateLocale: DateFnsLocale;
 }) {
@@ -720,6 +819,17 @@ function TimelineItem({
       <SystemEvent
         time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
         body={`${t("eliminated")}: ${name(item.record.eliminatedId)}`}
+      />
+    );
+  }
+
+  if (item.type === "tie") {
+    return (
+      <SystemEvent
+        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
+        body={t("tieRestart", {
+          names: item.record.tiedIds.map((id) => name(id)).join("、"),
+        })}
       />
     );
   }
