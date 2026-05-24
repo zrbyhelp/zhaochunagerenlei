@@ -4,7 +4,7 @@ FROM node:22.14.0-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 WORKDIR /app
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
