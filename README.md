@@ -20,6 +20,7 @@
 复制 `.env.example` 并填写：
 
 ```bash
+PORT=3000
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_BASE_URL=
@@ -47,6 +48,7 @@ pnpm docs:dev
 OPENAI_API_KEY=你的密钥
 OPENAI_MODEL=gpt-5.5
 OPENAI_BASE_URL=https://ai.zrbyhelp.com/v1
+PORT=3000
 ```
 
 然后运行：
@@ -55,7 +57,7 @@ OPENAI_BASE_URL=https://ai.zrbyhelp.com/v1
 docker compose up -d --build
 ```
 
-服务默认暴露在 `http://localhost:3000`。镜像使用 Next.js standalone 输出，不会把 `.env.local` 打进镜像。
+服务默认暴露在 `http://localhost:${PORT}`，未设置时为 `http://localhost:3000`。镜像使用 Next.js standalone 输出，不会把 `.env.local` 打进镜像。
 
 ## 技术栈
 

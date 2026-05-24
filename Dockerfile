@@ -17,11 +17,12 @@ COPY . .
 RUN pnpm build
 
 FROM node:22.14.0-alpine AS runner
+ARG PORT=3000
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME="0.0.0.0"
-ENV PORT=3000
+ENV PORT=${PORT}
 
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 
@@ -30,6 +31,6 @@ COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
 
 USER nextjs
-EXPOSE 3000
+EXPOSE ${PORT}
 
 CMD ["node", "server.js"]

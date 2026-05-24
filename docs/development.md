@@ -17,6 +17,7 @@ pnpm docs:dev
 项目提供 `Dockerfile` 与 `docker-compose.yml`。部署前在服务器环境或 `.env` 文件中配置：
 
 ```bash
+PORT=3000
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_BASE_URL=
@@ -28,7 +29,7 @@ OPENAI_BASE_URL=
 docker compose up -d --build
 ```
 
-容器内默认监听 `3000` 端口，Compose 映射到宿主机 `3000`。镜像使用 Next.js standalone 输出，环境变量在容器运行时读取。
+容器端口和宿主机映射都通过 `PORT` 环境变量设置，未设置时默认 `3000`。镜像使用 Next.js standalone 输出，环境变量在容器运行时读取。
 
 ## 目录
 

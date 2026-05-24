@@ -29,6 +29,7 @@ OPENAI_MODEL=
 可选：
 
 ```bash
+PORT=
 OPENAI_BASE_URL=
 LANGFUSE_PUBLIC_KEY=
 LANGFUSE_SECRET_KEY=
@@ -45,4 +46,4 @@ LANGFUSE_BASEURL=
 docker compose up -d --build
 ```
 
-运行前请通过服务器环境变量或 `.env` 文件提供 `OPENAI_API_KEY`、`OPENAI_MODEL`，以及可选的 `OPENAI_BASE_URL`。
+运行前请通过服务器环境变量或 `.env` 文件提供 `OPENAI_API_KEY`、`OPENAI_MODEL`，以及可选的 `OPENAI_BASE_URL`、`PORT`。未设置 `PORT` 时默认使用 `3000`。

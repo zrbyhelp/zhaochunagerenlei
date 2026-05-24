@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "pnpm run dev:app & pnpm run docs:dev",
-    "dev:app": "next dev",
+    "dev:app": "node scripts/next-with-port.mjs dev",
     "build": "next build",
     "docs:dev": "vitepress dev docs",
-    "start": "next start",
+    "start": "node scripts/next-with-port.mjs start",
     "lint": "eslint",
     "test": "vitest run"
   },
