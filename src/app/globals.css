@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+:root {
+  --font-sans: "Inter", "Noto Sans SC", "Microsoft YaHei", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --background: #081019;
+  --foreground: #edf7ff;
+  --muted-foreground: #9ab1bf;
+  --panel: rgba(13, 30, 42, 0.78);
+  --panel-strong: rgba(21, 47, 61, 0.92);
+  --line: rgba(160, 211, 238, 0.22);
+  --accent: #3dd5b0;
+  --accent-foreground: #06130f;
+  --accent-glow: rgba(61, 213, 176, 0.26);
+  --warning: #f2d36b;
+  --danger: #d95b6a;
+  --density-space: 1rem;
+  --text-scale: 1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+:root[data-theme-mode="light"] {
+  --background: #edf5f8;
+  --foreground: #10202b;
+  --muted-foreground: #587080;
+  --panel: rgba(255, 255, 255, 0.82);
+  --panel-strong: rgba(247, 252, 253, 0.96);
+  --line: rgba(22, 55, 73, 0.18);
+}
+
+:root[data-palette="matrix"] {
+  --accent: #7cff7a;
+  --accent-foreground: #071307;
+  --accent-glow: rgba(124, 255, 122, 0.2);
+  --warning: #f0f06a;
+}
+
+:root[data-palette="deep-space"] {
+  --accent: #6ec8ff;
+  --accent-foreground: #06101a;
+  --accent-glow: rgba(110, 200, 255, 0.2);
+  --warning: #f2b36b;
+}
+
+:root[data-palette="dawn-mist"] {
+  --accent: #d07bff;
+  --accent-foreground: #17051f;
+  --accent-glow: rgba(208, 123, 255, 0.18);
+  --warning: #7a9cff;
+}
+
+:root[data-density="comfortable"] {
+  --density-space: 1.25rem;
+}
+
+:root[data-density="compact"] {
+  --density-space: 0.75rem;
+}
+
+:root[data-type-scale="small"] {
+  --text-scale: 0.94;
+}
+
+:root[data-type-scale="large"] {
+  --text-scale: 1.06;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 16, 25, 0.18), var(--background)),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: calc(16px * var(--text-scale));
+  letter-spacing: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.world-surface {
+  background-image:
+    linear-gradient(rgba(110, 200, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(110, 200, 255, 0.08) 1px, transparent 1px),
+    url("/ai-horizon.svg");
+  background-position:
+    center,
+    center,
+    center bottom;
+  background-size:
+    48px 48px,
+    48px 48px,
+    cover;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+}
+
+.field {
+  min-height: 2.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--foreground);
+  padding: 0.65rem 0.75rem;
+}
+
+.field::placeholder {
+  color: var(--muted-foreground);
+}
+
+.scan-line {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent),
+    transparent
+  );
+  height: 1px;
+  opacity: 0.7;
+}
