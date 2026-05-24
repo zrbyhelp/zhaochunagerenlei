@@ -56,7 +56,7 @@ export const Phase2DefenseSchema = z.object({
   claim: z.string().min(8).max(260),
   suspicionTargetId: z.string().min(1),
   suspicionReason: z.string().min(8).max(220),
-  contextAnchors: z.array(z.string().min(2).max(80)).min(1).max(4),
+  contextAnchors: z.array(z.string().min(2).max(80)).min(1),
 });
 
 export const AiActionResponseSchema = z.union([
