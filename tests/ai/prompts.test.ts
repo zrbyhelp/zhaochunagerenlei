@@ -51,6 +51,40 @@ describe("AI prompts", () => {
     expect(prompt.user).toContain("worried you might be the undercover");
     expect(prompt.user).toContain("Give only one low-risk clue");
     expect(prompt.user).toContain("Avoid highly specific uses");
+    expect(prompt.user).toContain("must genuinely fit ownWord");
+    expect(prompt.user).toContain("must not repeat semantic clues");
+    expect(prompt.user).toContain("you or anyone else");
+  });
+
+  it("reviews phase-one speeches for semantic repeats and word fit", () => {
+    const prompt = actionPrompt({
+      action: "phase1SpeechReview",
+      locale: "zh-CN",
+      actor: {
+        id: "player",
+        name: "臧浩然",
+        word: "订书机",
+      },
+      candidates: [{ id: "ai-1", name: "林澈" }],
+      context: {
+        proposedSpeech: "它能把桌上的纸整理到一起。",
+        previousSpeeches: [
+          {
+            id: "speech-1",
+            speakerId: "ai-1",
+            text: "办公桌上把零散纸张收拢住的小东西。",
+          },
+        ],
+      },
+    });
+    const joined = `${prompt.system}\n${prompt.user}`;
+
+    expect(joined).toContain("Review a proposed phase-one speech");
+    expect(joined).toContain("genuinely fits ownWord");
+    expect(joined).toContain("same speaker or another speaker already said");
+    expect(joined).toContain("Semantic repeat includes the same scene");
+    expect(joined).toContain("off_word");
+    expect(joined).toContain("semantic_repeat");
   });
 
   it("tells phase-one AI players to reason cautiously without knowing identity", () => {
@@ -72,7 +106,9 @@ describe("AI prompts", () => {
     expect(joined).toContain("not a perfect detective");
     expect(joined).toContain("Do not optimize for the single best semantic outlier");
     expect(joined).toContain("Use your voting bias");
-    expect(joined).toContain("currentVotes");
+    expect(joined).toContain("completed previous-round vote records");
+    expect(joined).toContain("current-round partial vote results");
+    expect(joined).not.toContain("currentVotes");
     expect(joined).toContain("you may have the different word");
     expect(joined).toContain("Only return targetId");
     expect(joined).not.toContain("\"reason\":\"string\"");

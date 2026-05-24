@@ -75,6 +75,9 @@ export function actionPrompt(request: AiActionRequest) {
           "You only know your own word, not your hidden identity.",
           "You must guess what the likely real majority word is from public speeches.",
           "If your own word may be the different word, speak more carefully and leave room.",
+          "Your description must genuinely fit ownWord. Do not say a clue that would only fit a different object, person, place, or concept.",
+          "You must not repeat semantic clues that you or anyone else already said in phase one.",
+          "Do not rephrase an existing scene, function, use case, feeling, appearance clue, or association in different words.",
           "Act like you are a little worried you might be the undercover: do not be too confident.",
           "Use one or two short casual sentences, under 70 Chinese characters or 45 English words when possible.",
           "Give only one low-risk clue: a vague everyday scene, broad feeling, or loose association.",
@@ -91,6 +94,38 @@ export function actionPrompt(request: AiActionRequest) {
     };
   }
 
+  if (request.action === "phase1SpeechReview") {
+    return {
+      system: base.join("\n"),
+      user: JSON.stringify({
+        task: "Review a proposed phase-one speech before it becomes public.",
+        requirements: [
+          "You only know the speaker's ownWord, the proposed speech, and public phase-one speeches.",
+          "You do not know the hidden identity, the common word, the undercover word, or the true word pair.",
+          "Accept only if the proposed speech genuinely fits ownWord.",
+          "Reject if it could not reasonably describe ownWord or mainly describes a different word.",
+          "Reject if it semantically repeats something the same speaker or another speaker already said.",
+          "Semantic repeat includes the same scene, function, use case, feeling, appearance clue, or association even if the wording is different.",
+          "Reject if it is too specific, reveals the exact word, uses a near-identical phrase to the word, or makes the word too easy to identify.",
+          "Be fair: broad overlap in ordinary language is allowed only when the actual clue idea is meaningfully new.",
+          "Return a short player-facing message explaining how to revise when rejected.",
+        ],
+        outputShape: {
+          accepted: "boolean",
+          reasonCode: "ok | semantic_repeat | off_word | too_specific | reveals_word",
+          message: "string",
+          matchedSpeechId: "optional string",
+        },
+        ownWord: request.actor.word,
+        speaker: {
+          id: request.actor.id,
+          name: request.actor.name,
+        },
+        publicContext: request.context,
+      }),
+    };
+  }
+
   if (request.action === "phase1Vote") {
     return {
       system: base.join("\n"),
@@ -100,7 +135,8 @@ export function actionPrompt(request: AiActionRequest) {
           "You only know your own word, not your hidden identity.",
           "Do not optimize for the single best semantic outlier.",
           "Use your voting bias even when it means choosing someone who is only mildly suspicious.",
-          "Consider currentVotes if provided: a follow-the-room persona may follow them, while other personas may ignore or resist them.",
+          "You may consider completed previous-round vote records if provided.",
+          "Do not use or ask for current-round partial vote results. Vote independently for the current round.",
           "Consider quiet, repetitive, overconfident, hesitant, or inconsistent table behavior according to your persona.",
           "If several people are plausible, pick among them in a human, imperfect way.",
           "Remember you may have the different word yourself, so do not be too accurate or too certain.",
@@ -157,6 +193,7 @@ export function actionPrompt(request: AiActionRequest) {
         "Prioritize who seems like a human disguise: over-human personal experience, evasive self-defense, emotional reversal, unnatural certainty, copying others, or suspicious vote movement.",
         "Do not make the vote reason mainly about who had the wrong word.",
         "Use your voting bias. You are allowed to follow the room, avoid conflict, trust a gut read, or suspect quiet/repetitive players.",
+        "You may consider completed previous-round vote records if provided, but never current-round partial vote results.",
         "Do not act like a perfectly calibrated detector.",
         "Write the reason like a real player making a final vote.",
         "Use concrete behavior from the chat instead of generic summaries.",

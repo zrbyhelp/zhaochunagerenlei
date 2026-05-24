@@ -28,7 +28,13 @@ export const CandidateSchema = z.object({
 });
 
 export const AiActionRequestSchema = z.object({
-  action: z.enum(["phase1Speech", "phase1Vote", "phase2Defense", "phase2Vote"]),
+  action: z.enum([
+    "phase1Speech",
+    "phase1SpeechReview",
+    "phase1Vote",
+    "phase2Defense",
+    "phase2Vote",
+  ]),
   locale: z.enum(["zh-CN", "en-US"]),
   actor: AiActorSchema,
   candidates: z.array(CandidateSchema).min(1),
@@ -37,6 +43,19 @@ export const AiActionRequestSchema = z.object({
 
 export const Phase1SpeechSchema = z.object({
   speech: z.string().min(1),
+});
+
+export const Phase1SpeechReviewSchema = z.object({
+  accepted: z.boolean(),
+  reasonCode: z.enum([
+    "ok",
+    "semantic_repeat",
+    "off_word",
+    "too_specific",
+    "reveals_word",
+  ]),
+  message: z.string().min(1),
+  matchedSpeechId: z.string().min(1).optional(),
 });
 
 export const Phase1VoteSchema = z.object({
@@ -59,6 +78,7 @@ export const Phase2DefenseSchema = z.object({
 
 export const AiActionResponseSchema = z.union([
   Phase1SpeechSchema,
+  Phase1SpeechReviewSchema,
   Phase1VoteSchema,
   VoteActionSchema,
   Phase2DefenseSchema,
@@ -67,6 +87,7 @@ export const AiActionResponseSchema = z.union([
 export type WordPairOutput = z.infer<typeof WordPairSchema>;
 export type AiActionRequest = z.infer<typeof AiActionRequestSchema>;
 export type Phase1SpeechOutput = z.infer<typeof Phase1SpeechSchema>;
+export type Phase1SpeechReviewOutput = z.infer<typeof Phase1SpeechReviewSchema>;
 export type Phase1VoteOutput = z.infer<typeof Phase1VoteSchema>;
 export type Phase2VoteOutput = z.infer<typeof Phase2VoteSchema>;
 export type VoteActionOutput = Phase2VoteOutput;
@@ -95,6 +116,10 @@ export function responseSchemaForAction(
 ): z.ZodType<AiActionResponse> {
   if (action === "phase1Speech") {
     return Phase1SpeechSchema as z.ZodType<AiActionResponse>;
+  }
+
+  if (action === "phase1SpeechReview") {
+    return Phase1SpeechReviewSchema as z.ZodType<AiActionResponse>;
   }
 
   if (action === "phase2Defense") {
