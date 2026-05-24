@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   Phase1SpeechSchema,
-  Phase1SpeechReviewSchema,
   Phase1VoteSchema,
   Phase2DefenseSchema,
   Phase2VoteSchema,
@@ -37,29 +36,6 @@ describe("AI schemas", () => {
         reason: "我觉得他描述不太一样",
       }),
     ).toEqual({ targetId: "ai-1" });
-  });
-
-  it("parses phase-one speech review decisions", () => {
-    expect(
-      Phase1SpeechReviewSchema.parse({
-        accepted: true,
-        reasonCode: "ok",
-        message: "可以发。",
-      }),
-    ).toMatchObject({ accepted: true, reasonCode: "ok" });
-
-    expect(
-      Phase1SpeechReviewSchema.parse({
-        accepted: false,
-        reasonCode: "semantic_repeat",
-        message: "这条线索和前面太像了。",
-        matchedSpeechId: "speech-1",
-      }),
-    ).toMatchObject({
-      accepted: false,
-      reasonCode: "semantic_repeat",
-      matchedSpeechId: "speech-1",
-    });
   });
 
   it("requires phase-two votes to include a reason", () => {

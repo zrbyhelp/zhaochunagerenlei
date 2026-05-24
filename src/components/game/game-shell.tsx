@@ -37,7 +37,6 @@ import type {
   WordPair,
 } from "@/lib/game/types";
 import type {
-  Phase1SpeechReviewOutput,
   Phase1VoteOutput,
   Phase1SpeechOutput,
   Phase2DefenseOutput,
@@ -88,11 +87,7 @@ function votePayload(votes: Array<Pick<VoteRecord, "voterId" | "targetId">>) {
   return votes.map(({ voterId, targetId }) => ({ voterId, targetId }));
 }
 
-function phase1SpeechContext(
-  state: GameState,
-  proposedSpeech?: string,
-  rejectedAttempts: Array<Pick<Phase1SpeechReviewOutput, "reasonCode" | "message" | "matchedSpeechId"> & { speech: string }> = [],
-) {
+function phase1SpeechContext(state: GameState) {
   return {
     round: state.phase1Round,
     participants: publicParticipants(state),
@@ -100,8 +95,6 @@ function phase1SpeechContext(
     currentRoundSpeeches: state.speeches.filter(
       (speech) => speech.round === state.phase1Round,
     ),
-    proposedSpeech,
-    rejectedAttempts,
   };
 }
 
@@ -154,91 +147,26 @@ export function GameShell() {
     [t],
   );
 
-  const speechReviewMessage = useCallback(
-    (review: Phase1SpeechReviewOutput) => {
-      if (review.reasonCode === "semantic_repeat") return t("speechReviewRepeated");
-      if (review.reasonCode === "off_word") return t("speechReviewOffWord");
-      if (review.reasonCode === "too_specific") return t("speechReviewTooSpecific");
-      if (review.reasonCode === "reveals_word") return t("speechReviewRevealsWord");
-
-      return review.message;
-    },
-    [t],
-  );
-
-  const reviewPhase1Speech = useCallback(
-    async (
-      stateSnapshot: GameState,
-      speaker: Participant,
-      speech: string,
-      rejectedAttempts?: Array<
-        Pick<Phase1SpeechReviewOutput, "reasonCode" | "message" | "matchedSpeechId"> & {
-          speech: string;
-        }
-      >,
-    ) => {
-      const data = await postJson<ApiResult<Phase1SpeechReviewOutput>>("/api/ai/act", {
-        action: "phase1SpeechReview",
-        locale,
-        actor: actorPayload(speaker),
-        candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
-        context: phase1SpeechContext(stateSnapshot, speech, rejectedAttempts),
-      });
-
-      return data.result;
-    },
-    [locale],
-  );
-
   const runAiSpeechFor = useCallback(
     async (stateSnapshot: GameState, speaker: Participant) => {
       setLoading(true);
 
       try {
-        const rejectedAttempts: Array<
-          Pick<Phase1SpeechReviewOutput, "reasonCode" | "message" | "matchedSpeechId"> & {
-            speech: string;
-          }
-        > = [];
-
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          const data = await postJson<ApiResult<Phase1SpeechOutput>>("/api/ai/act", {
-            action: "phase1Speech",
-            locale,
-            actor: actorPayload(speaker),
-            candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
-            context: phase1SpeechContext(stateSnapshot, undefined, rejectedAttempts),
-          });
-          const review = await reviewPhase1Speech(
-            stateSnapshot,
-            speaker,
-            data.result.speech,
-            rejectedAttempts,
-          );
-
-          if (review.accepted) {
-            setState(recordSpeech(stateSnapshot, speaker.id, data.result.speech));
-            return;
-          }
-
-          rejectedAttempts.push({
-            speech: data.result.speech,
-            reasonCode: review.reasonCode,
-            message: review.message,
-            matchedSpeechId: review.matchedSpeechId,
-          });
-        }
-
-        throw new Error(
-          rejectedAttempts.at(-1)?.message ?? "PHASE1_SPEECH_REVIEW_REJECTED",
-        );
+        const data = await postJson<ApiResult<Phase1SpeechOutput>>("/api/ai/act", {
+          action: "phase1Speech",
+          locale,
+          actor: actorPayload(speaker),
+          candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
+          context: phase1SpeechContext(stateSnapshot),
+        });
+        setState(recordSpeech(stateSnapshot, speaker.id, data.result.speech));
       } catch (error) {
         showModelError(error);
       } finally {
         setLoading(false);
       }
     },
-    [locale, reviewPhase1Speech, showModelError],
+    [locale, showModelError],
   );
 
   const runAiDefenseFor = useCallback(
@@ -340,25 +268,10 @@ export function GameShell() {
     setPhase1Summary(null);
   }
 
-  async function submitPlayerSpeech() {
-    if (!state || !currentSpeaker || !speechText.trim() || loading) return;
-    const proposedSpeech = speechText.trim();
-
-    setLoading(true);
-    try {
-      const review = await reviewPhase1Speech(state, currentSpeaker, proposedSpeech);
-      if (!review.accepted) {
-        toast.error(`${speechReviewMessage(review)} ${t("speechReviewRetry")}`);
-        return;
-      }
-
-      setState(recordSpeech(state, currentSpeaker.id, proposedSpeech));
-      setSpeechText("");
-    } catch (error) {
-      showModelError(error);
-    } finally {
-      setLoading(false);
-    }
+  function submitPlayerSpeech() {
+    if (!state || !currentSpeaker || !speechText.trim()) return;
+    setState(recordSpeech(state, currentSpeaker.id, speechText));
+    setSpeechText("");
   }
 
   async function completePhase1Vote() {
@@ -527,7 +440,6 @@ export function GameShell() {
                   currentSpeaker.id === PLAYER_ID ? (
                     <SpeechComposer
                       text={speechText}
-                      loading={loading}
                       onTextChange={setSpeechText}
                       onSubmit={submitPlayerSpeech}
                     />
@@ -998,14 +910,12 @@ function Avatar({ participant }: { participant?: Participant }) {
 
 function SpeechComposer({
   text,
-  loading,
   onTextChange,
   onSubmit,
 }: {
   text: string;
-  loading: boolean;
   onTextChange: (value: string) => void;
-  onSubmit: () => void | Promise<void>;
+  onSubmit: () => void;
 }) {
   const t = useTranslations("game");
 
@@ -1018,9 +928,9 @@ function SpeechComposer({
         placeholder={t("speechPlaceholder")}
       />
       <div className="flex justify-end">
-        <Button type="button" disabled={loading} onClick={onSubmit}>
-          {loading ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
-          {loading ? t("reviewingSpeech") : t("submitSpeech")}
+        <Button type="button" onClick={onSubmit}>
+          <Send size={16} />
+          {t("submitSpeech")}
         </Button>
       </div>
     </div>

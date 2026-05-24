@@ -109,11 +109,6 @@ function mockGameFetch(options: {
     actor?: { id: string; name: string };
     context?: Record<string, unknown>;
   }>;
-  phase1SpeechReview?: (body: {
-    action?: string;
-    actor?: { id: string; name: string };
-    context?: Record<string, unknown>;
-  }) => { accepted: boolean; reasonCode: string; message: string; matchedSpeechId?: string };
 }) {
   vi.stubGlobal(
     "fetch",
@@ -144,16 +139,6 @@ function mockGameFetch(options: {
         return Response.json({
           result: {
             speech: `${body.actor?.name ?? "AI"}说这个东西挺常见，办公桌上经常碰到。`,
-          },
-        });
-      }
-
-      if (body.action === "phase1SpeechReview") {
-        return Response.json({
-          result: options.phase1SpeechReview?.(body) ?? {
-            accepted: true,
-            reasonCode: "ok",
-            message: "可以发。",
           },
         });
       }
@@ -234,7 +219,7 @@ describe("GameShell", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/api/ai/word-pair")) {
           return Response.json({
@@ -243,17 +228,6 @@ describe("GameShell", () => {
               undercoverWord: "牙膏",
               category: "生活物品",
               sceneIntro: "一组日常生活用品。",
-            },
-          });
-        }
-
-        const body = JSON.parse(String(init?.body ?? "{}")) as { action?: string };
-        if (body.action === "phase1SpeechReview") {
-          return Response.json({
-            result: {
-              accepted: true,
-              reasonCode: "ok",
-              message: "可以发。",
             },
           });
         }
@@ -283,110 +257,6 @@ describe("GameShell", () => {
     expect(screen.queryByText("普通阵营")).not.toBeInTheDocument();
     expect(screen.queryByText("卧底阵营")).not.toBeInTheDocument();
     expect(screen.queryByText("生成 AI 发言")).not.toBeInTheDocument();
-  });
-
-  it("retries AI phase-one speech when the review rejects a repeated clue", async () => {
-    const user = userEvent.setup();
-    let speechCalls = 0;
-    let reviewCalls = 0;
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.includes("/api/ai/word-pair")) {
-          return Response.json({
-            wordPair: {
-              commonWord: "牙刷",
-              undercoverWord: "牙膏",
-              category: "生活物品",
-              sceneIntro: "一组日常生活用品。",
-            },
-          });
-        }
-
-        const body = JSON.parse(String(init?.body ?? "{}")) as { action?: string };
-        if (body.action === "phase1Speech") {
-          speechCalls += 1;
-          return Response.json({
-            result: {
-              speech:
-                speechCalls === 1
-                  ? "早上洗漱会想到它。"
-                  : "放在台面上时存在感不强，但每天都会顺手碰到。",
-            },
-          });
-        }
-
-        if (body.action === "phase1SpeechReview") {
-          reviewCalls += 1;
-          return Response.json({
-            result:
-              reviewCalls === 1
-                ? {
-                    accepted: false,
-                    reasonCode: "semantic_repeat",
-                    message: "这条线索和前面太像了。",
-                    matchedSpeechId: "speech-1",
-                  }
-                : {
-                    accepted: true,
-                    reasonCode: "ok",
-                    message: "可以发。",
-                  },
-          });
-        }
-
-        return Response.json({ result: { targetId: PLAYER_ID } });
-      }),
-    );
-    renderGame();
-
-    await user.type(screen.getByPlaceholderText("输入你的代号"), "臧浩然");
-    await user.click(screen.getByRole("button", { name: "启动审查" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("放在台面上时存在感不强，但每天都会顺手碰到。")).toBeInTheDocument();
-    });
-    expect(screen.queryByText("早上洗漱会想到它。")).not.toBeInTheDocument();
-    expect(speechCalls).toBeGreaterThanOrEqual(2);
-    expect(reviewCalls).toBeGreaterThanOrEqual(2);
-  });
-
-  it("reviews player phase-one speech before adding it to the chat", async () => {
-    const user = userEvent.setup();
-    const actionCounts: Record<string, number> = {};
-    vi.spyOn(Math, "random").mockReturnValue(0.26);
-    mockGameFetch({
-      actionCounts,
-      phase1VoteTarget: () => "ai-1",
-      phase1SpeechReview: (body) =>
-        body.actor?.id === PLAYER_ID
-          ? {
-              accepted: false,
-              reasonCode: "semantic_repeat",
-              message: "这条线索和前面太像了。",
-              matchedSpeechId: "speech-1",
-            }
-          : {
-              accepted: true,
-              reasonCode: "ok",
-              message: "可以发。",
-            },
-    });
-    renderGame();
-
-    await startFourPlayerGame(user);
-    const textarea = screen.getByPlaceholderText("描述你的词语，但不要直接说出答案。");
-    await user.type(textarea, "办公桌上用来整理东西的小工具。");
-    await user.click(screen.getByRole("button", { name: "提交发言" }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "提交发言" })).toBeInTheDocument();
-    });
-    expect(textarea).toHaveValue("办公桌上用来整理东西的小工具。");
-    expect(screen.queryByRole("heading", { name: "一阶段投票" })).not.toBeInTheDocument();
-    expect(actionCounts.phase1SpeechReview).toBeGreaterThan(0);
   });
 
   it("keeps chat records scrollable and moves to the latest message", async () => {

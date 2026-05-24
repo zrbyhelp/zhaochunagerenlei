@@ -94,38 +94,6 @@ export function actionPrompt(request: AiActionRequest) {
     };
   }
 
-  if (request.action === "phase1SpeechReview") {
-    return {
-      system: base.join("\n"),
-      user: JSON.stringify({
-        task: "Review a proposed phase-one speech before it becomes public.",
-        requirements: [
-          "You only know the speaker's ownWord, the proposed speech, and public phase-one speeches.",
-          "You do not know the hidden identity, the common word, the undercover word, or the true word pair.",
-          "Accept only if the proposed speech genuinely fits ownWord.",
-          "Reject if it could not reasonably describe ownWord or mainly describes a different word.",
-          "Reject if it semantically repeats something the same speaker or another speaker already said.",
-          "Semantic repeat includes the same scene, function, use case, feeling, appearance clue, or association even if the wording is different.",
-          "Reject if it is too specific, reveals the exact word, uses a near-identical phrase to the word, or makes the word too easy to identify.",
-          "Be fair: broad overlap in ordinary language is allowed only when the actual clue idea is meaningfully new.",
-          "Return a short player-facing message explaining how to revise when rejected.",
-        ],
-        outputShape: {
-          accepted: "boolean",
-          reasonCode: "ok | semantic_repeat | off_word | too_specific | reveals_word",
-          message: "string",
-          matchedSpeechId: "optional string",
-        },
-        ownWord: request.actor.word,
-        speaker: {
-          id: request.actor.id,
-          name: request.actor.name,
-        },
-        publicContext: request.context,
-      }),
-    };
-  }
-
   if (request.action === "phase1Vote") {
     return {
       system: base.join("\n"),
