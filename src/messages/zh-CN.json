@@ -8,6 +8,7 @@
     "admin": "后台",
     "language": "语言",
     "theme": "主题",
+    "github": "开源仓库",
     "docs": "文档"
   },
   "game": {
@@ -27,6 +28,7 @@
     "phase1": "一阶段：谁是卧底",
     "phase2": "二阶段：找出那个人类",
     "round": "第 {round} 轮",
+    "inProgress": "进行中",
     "speaker": "当前发言",
     "submitSpeech": "提交发言",
     "generateSpeech": "生成 AI 发言",
@@ -43,6 +45,7 @@
     "phase2VoteHelp": "如果你是最高票或并列最高票，AI 阵营会找到真正的人类。",
     "completeVote": "完成投票",
     "generatingAi": "正在等待 AI 独立推理",
+    "aiTyping": "正在输入...",
     "restart": "重新开始",
     "winnerWin": "审查通过，你没有被投出局。",
     "winnerLose": "审查失败，你被系统锁定。",
@@ -58,6 +61,9 @@
     "target": "目标",
     "reason": "理由",
     "playerVoteReason": "玩家投票",
+    "voted": "已投票",
+    "suspectsLabel": "怀疑：",
+    "suspicionReasonLabel": "理由：",
     "modelError": "模型调用失败：{message}",
     "invalidName": "请输入玩家名称。",
     "wordPair": "词语对",
@@ -67,7 +73,8 @@
   },
   "admin": {
     "title": "后台控制台",
-    "subtitle": "首版不保存密钥，只展示环境状态与本地偏好。",
+    "subtitle": "这里用于调整本地界面偏好和查看项目资料，不展示模型密钥或环境配置状态。",
+    "backToGame": "返回对局",
     "modelStatus": "模型配置",
     "configured": "已配置",
     "missing": "未配置",
@@ -78,6 +85,7 @@
     "langfuse": "Langfuse 观测",
     "themeSettings": "界面设置",
     "projectInfo": "项目信息",
+    "projectDescription": "单机网页游戏，AI 玩家通过真实 OpenAI-compatible 模型独立生成发言、辩解和投票。",
     "license": "MIT License",
     "contact": "联系方式：QQ 778241343，电话/微信 15043201648，邮箱 q19946502@gmail.com"
   },

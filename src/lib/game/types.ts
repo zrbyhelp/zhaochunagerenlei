@@ -21,6 +21,13 @@ export type WordPair = {
   sceneIntro: string;
 };
 
+export type AiPersona = {
+  label: string;
+  speakingStyle: string;
+  catchphrases: string[];
+  reasoningStyle: string;
+};
+
 export type Participant = {
   id: string;
   name: string;
@@ -28,6 +35,7 @@ export type Participant = {
   role: Role;
   word: string;
   active: boolean;
+  persona?: AiPersona;
 };
 
 export type SpeechRecord = {
@@ -107,8 +115,7 @@ export type CreateGameInput = {
 };
 
 export type Phase2Context = {
-  wordPair: WordPair;
-  participants: Array<Pick<Participant, "id" | "name" | "kind" | "active">>;
+  participants: Array<Pick<Participant, "id" | "name" | "active">>;
   speeches: SpeechRecord[];
   phase1Votes: VoteRecord[];
   eliminations: EliminationRecord[];

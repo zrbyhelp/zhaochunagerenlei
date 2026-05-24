@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PLAYER_ID,
+  buildPhase2Context,
   createGame,
   getCurrentSpeaker,
   recordPhase1Votes,
@@ -39,6 +40,8 @@ describe("game state", () => {
       kind: "human",
     });
     expect(state.participants.slice(1).every((item) => item.kind === "ai")).toBe(true);
+    expect(state.participants.slice(1).every((item) => item.persona)).toBe(true);
+    expect(state.participants.slice(1).map((item) => item.name)).not.toContain("星图零一");
     expect(state.speakingOrder).toHaveLength(4);
   });
 
@@ -94,6 +97,29 @@ describe("game state", () => {
     );
 
     expect(state.stage).toBe("phase2_defense");
+  });
+
+  it("builds phase-two context without exposing hidden words or roles", () => {
+    let state = createGame({
+      locale: "zh-CN",
+      playerName: "测试员",
+      playerCount: 4,
+      wordPair,
+      rng: rng([0.99, 0.1, 0.2, 0.3, 0.4]),
+    });
+
+    for (const speakerId of state.speakingOrder) {
+      state = recordSpeech(state, speakerId, `${speakerId} says clue`);
+    }
+
+    const context = buildPhase2Context(state);
+
+    expect(context).not.toHaveProperty("wordPair");
+    expect(JSON.stringify(context)).not.toContain(wordPair.commonWord);
+    expect(JSON.stringify(context)).not.toContain(wordPair.undercoverWord);
+    expect(context.participants[0]).not.toHaveProperty("role");
+    expect(context.participants[0]).not.toHaveProperty("word");
+    expect(context.participants[0]).not.toHaveProperty("kind");
   });
 
   it("fails phase one when the player is eliminated", () => {

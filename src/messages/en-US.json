@@ -8,6 +8,7 @@
     "admin": "Admin",
     "language": "Language",
     "theme": "Theme",
+    "github": "Open-source repository",
     "docs": "Docs"
   },
   "game": {
@@ -27,6 +28,7 @@
     "phase1": "Phase 1: Undercover",
     "phase2": "Phase 2: Find the Human",
     "round": "Round {round}",
+    "inProgress": "In progress",
     "speaker": "Current speaker",
     "submitSpeech": "Submit speech",
     "generateSpeech": "Generate AI speech",
@@ -43,6 +45,7 @@
     "phase2VoteHelp": "If you have the top vote count or tie for top, the AI side finds the human.",
     "completeVote": "Complete vote",
     "generatingAi": "Waiting for independent AI reasoning",
+    "aiTyping": "is typing...",
     "restart": "Restart",
     "winnerWin": "Audit passed. You were not voted out.",
     "winnerLose": "Audit failed. The system identified you.",
@@ -58,6 +61,9 @@
     "target": "Target",
     "reason": "Reason",
     "playerVoteReason": "Player vote",
+    "voted": "Voted",
+    "suspectsLabel": "Suspects: ",
+    "suspicionReasonLabel": "Reason: ",
     "modelError": "Model call failed: {message}",
     "invalidName": "Enter a player name.",
     "wordPair": "Word pair",
@@ -67,7 +73,8 @@
   },
   "admin": {
     "title": "Admin Console",
-    "subtitle": "The first version does not store secrets. It only shows environment status and local preferences.",
+    "subtitle": "Adjust local interface preferences and view project details here. Model secrets and environment status are not displayed.",
+    "backToGame": "Back to game",
     "modelStatus": "Model configuration",
     "configured": "Configured",
     "missing": "Missing",
@@ -78,6 +85,7 @@
     "langfuse": "Langfuse tracing",
     "themeSettings": "Interface settings",
     "projectInfo": "Project info",
+    "projectDescription": "A single-player web game where AI players use real OpenAI-compatible model calls for speeches, defenses, and votes.",
     "license": "MIT License",
     "contact": "Contact: QQ 778241343, phone/WeChat 15043201648, email q19946502@gmail.com"
   },

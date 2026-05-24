@@ -1,0 +1,15 @@
+services:
+  app:
+    build:
+      context: .
+    image: zhaochunagerenlei:latest
+    ports:
+      - "3000:3000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASEURL: ${LANGFUSE_BASEURL:-}
+    restart: unless-stopped

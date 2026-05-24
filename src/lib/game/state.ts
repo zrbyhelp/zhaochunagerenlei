@@ -1,4 +1,4 @@
-import { generateAiNames } from "./names";
+import { generateAiNames, generateAiPersonas } from "./names";
 import type {
   CreateGameInput,
   EliminationRecord,
@@ -72,6 +72,7 @@ export function createGame(input: CreateGameInput): GameState {
   ];
   const undercoverId = pickOne(participantIds, rng);
   const aiNames = generateAiNames(input.playerCount - 1, input.locale, rng);
+  const aiPersonas = generateAiPersonas(input.playerCount - 1, input.locale, rng);
   const participants: Participant[] = [
     {
       id: PLAYER_ID,
@@ -96,6 +97,7 @@ export function createGame(input: CreateGameInput): GameState {
             ? input.wordPair.undercoverWord
             : input.wordPair.commonWord,
         active: true,
+        persona: aiPersonas[index],
       };
     }),
   ];
@@ -353,11 +355,9 @@ export function recordPhase2Votes(
 
 export function buildPhase2Context(state: GameState): Phase2Context {
   return {
-    wordPair: state.wordPair,
-    participants: state.participants.map(({ id, name, kind, active }) => ({
+    participants: state.participants.map(({ id, name, active }) => ({
       id,
       name,
-      kind,
       active,
     })),
     speeches: state.speeches,

@@ -11,6 +11,14 @@ export const AiActorSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   word: z.string().min(1).optional(),
+  persona: z
+    .object({
+      label: z.string().min(1),
+      speakingStyle: z.string().min(1),
+      catchphrases: z.array(z.string().min(1)).min(1),
+      reasoningStyle: z.string().min(1),
+    })
+    .optional(),
 });
 
 export const CandidateSchema = z.object({
@@ -30,10 +38,18 @@ export const Phase1SpeechSchema = z.object({
   speech: z.string().min(4).max(220),
 });
 
-export const VoteActionSchema = z.object({
+export const Phase1VoteSchema = z
+  .object({
+    targetId: z.string().min(1),
+  })
+  .strict();
+
+export const Phase2VoteSchema = z.object({
   targetId: z.string().min(1),
   reason: z.string().min(4).max(180),
 });
+
+export const VoteActionSchema = Phase2VoteSchema;
 
 export const Phase2DefenseSchema = z.object({
   claim: z.string().min(8).max(260),
@@ -44,6 +60,7 @@ export const Phase2DefenseSchema = z.object({
 
 export const AiActionResponseSchema = z.union([
   Phase1SpeechSchema,
+  Phase1VoteSchema,
   VoteActionSchema,
   Phase2DefenseSchema,
 ]);
@@ -51,7 +68,9 @@ export const AiActionResponseSchema = z.union([
 export type WordPairOutput = z.infer<typeof WordPairSchema>;
 export type AiActionRequest = z.infer<typeof AiActionRequestSchema>;
 export type Phase1SpeechOutput = z.infer<typeof Phase1SpeechSchema>;
-export type VoteActionOutput = z.infer<typeof VoteActionSchema>;
+export type Phase1VoteOutput = z.infer<typeof Phase1VoteSchema>;
+export type Phase2VoteOutput = z.infer<typeof Phase2VoteSchema>;
+export type VoteActionOutput = Phase2VoteOutput;
 export type Phase2DefenseOutput = z.infer<typeof Phase2DefenseSchema>;
 export type AiActionResponse = z.infer<typeof AiActionResponseSchema>;
 
@@ -83,5 +102,9 @@ export function responseSchemaForAction(
     return Phase2DefenseSchema as z.ZodType<AiActionResponse>;
   }
 
-  return VoteActionSchema as z.ZodType<AiActionResponse>;
+  if (action === "phase1Vote") {
+    return Phase1VoteSchema as z.ZodType<AiActionResponse>;
+  }
+
+  return Phase2VoteSchema as z.ZodType<AiActionResponse>;
 }

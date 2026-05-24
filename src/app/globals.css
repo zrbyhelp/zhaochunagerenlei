@@ -15,6 +15,10 @@
   --warning: #f2d36b;
   --danger: #d95b6a;
   --density-space: 1rem;
+  --control-height: 2.5rem;
+  --button-x: 1rem;
+  --field-y: 0.65rem;
+  --content-leading: 1.5;
   --text-scale: 1;
 }
 
@@ -57,10 +61,18 @@
 
 :root[data-density="comfortable"] {
   --density-space: 1.25rem;
+  --control-height: 2.75rem;
+  --button-x: 1.15rem;
+  --field-y: 0.78rem;
+  --content-leading: 1.62;
 }
 
 :root[data-density="compact"] {
   --density-space: 0.75rem;
+  --control-height: 2.2rem;
+  --button-x: 0.8rem;
+  --field-y: 0.5rem;
+  --content-leading: 1.42;
 }
 
 :root[data-type-scale="small"] {
@@ -80,6 +92,10 @@ body {
   min-height: 100%;
 }
 
+html {
+  font-size: calc(16px * var(--text-scale));
+}
+
 body {
   margin: 0;
   background:
@@ -87,7 +103,8 @@ body {
     var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: calc(16px * var(--text-scale));
+  font-size: 1rem;
+  line-height: var(--content-leading);
   letter-spacing: 0;
 }
 
@@ -121,12 +138,12 @@ select {
 }
 
 .field {
-  min-height: 2.5rem;
+  min-height: var(--control-height);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel-strong);
   color: var(--foreground);
-  padding: 0.65rem 0.75rem;
+  padding: var(--field-y) 0.75rem;
 }
 
 .field::placeholder {

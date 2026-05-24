@@ -4,15 +4,16 @@ import { format } from "date-fns";
 import { enUS, zhCN, type Locale as DateFnsLocale } from "date-fns/locale";
 import {
   Bot,
-  CircleDot,
   Loader2,
   RefreshCcw,
+  Send,
   ShieldQuestion,
+  Sparkles,
   User,
   Vote,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,9 +36,10 @@ import type {
   WordPair,
 } from "@/lib/game/types";
 import type {
+  Phase1VoteOutput,
   Phase1SpeechOutput,
   Phase2DefenseOutput,
-  VoteActionOutput,
+  Phase2VoteOutput,
 } from "@/lib/ai/schemas";
 
 type ApiResult<T> = { result: T };
@@ -59,10 +61,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 function publicParticipants(state: GameState) {
-  return state.participants.map(({ id, name, kind, active }) => ({
+  return state.participants.map(({ id, name, active }) => ({
     id,
     name,
-    kind,
     active,
   }));
 }
@@ -72,6 +73,7 @@ function actorPayload(actor: Participant) {
     id: actor.id,
     name: actor.name,
     word: actor.word,
+    persona: actor.persona,
   };
 }
 
@@ -89,6 +91,7 @@ export function GameShell() {
   const [defenseText, setDefenseText] = useState("");
   const [selectedTarget, setSelectedTarget] = useState("");
   const [loading, setLoading] = useState(false);
+  const autoActionKeyRef = useRef("");
 
   const player = state?.participants.find((participant) => participant.id === PLAYER_ID);
   const currentSpeaker = state ? getCurrentSpeaker(state) : null;
@@ -97,6 +100,100 @@ export function GameShell() {
     [state, currentSpeaker],
   );
   const dateLocale = locale === "zh-CN" ? zhCN : enUS;
+
+  const showModelError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
+      toast.error(
+        message === "MODEL_ENV_INVALID"
+          ? t("configMissing")
+          : t("modelError", { message }),
+      );
+    },
+    [t],
+  );
+
+  const runAiSpeechFor = useCallback(
+    async (stateSnapshot: GameState, speaker: Participant) => {
+      setLoading(true);
+
+      try {
+        const data = await postJson<ApiResult<Phase1SpeechOutput>>("/api/ai/act", {
+          action: "phase1Speech",
+          locale,
+          actor: actorPayload(speaker),
+          candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
+          context: {
+            round: stateSnapshot.phase1Round,
+            participants: publicParticipants(stateSnapshot),
+            previousSpeeches: stateSnapshot.speeches.filter(
+              (speech) => speech.round === stateSnapshot.phase1Round,
+            ),
+          },
+        });
+        setState(recordSpeech(stateSnapshot, speaker.id, data.result.speech));
+      } catch (error) {
+        showModelError(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [locale, showModelError],
+  );
+
+  const runAiDefenseFor = useCallback(
+    async (stateSnapshot: GameState, speaker: Participant) => {
+      setLoading(true);
+
+      try {
+        const data = await postJson<ApiResult<Phase2DefenseOutput>>("/api/ai/act", {
+          action: "phase2Defense",
+          locale,
+          actor: actorPayload(speaker),
+          candidates: candidatePayload(getVoteCandidates(stateSnapshot, speaker.id)),
+          context: {
+            phaseOne: buildPhase2Context(stateSnapshot),
+            previousPhaseTwoStatements: stateSnapshot.phase2Statements,
+          },
+        });
+        setState(
+          recordPhase2Statement(stateSnapshot, {
+            speakerId: speaker.id,
+            claim: data.result.claim,
+            suspicionTargetId: data.result.suspicionTargetId,
+            suspicionReason: data.result.suspicionReason,
+            contextAnchors: data.result.contextAnchors,
+          }),
+        );
+      } catch (error) {
+        showModelError(error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [locale, showModelError],
+  );
+
+  useEffect(() => {
+    if (!state || loading) return;
+
+    const speaker = getCurrentSpeaker(state);
+    if (!speaker || speaker.kind !== "ai") return;
+
+    if (state.stage === "phase1_speech") {
+      const key = `${state.id}:phase1:${state.phase1Round}:${state.currentSpeakerIndex}:${speaker.id}:${state.speeches.length}`;
+      if (autoActionKeyRef.current === key) return;
+      autoActionKeyRef.current = key;
+      void runAiSpeechFor(state, speaker);
+    }
+
+    if (state.stage === "phase2_defense") {
+      const key = `${state.id}:phase2:${state.currentSpeakerIndex}:${speaker.id}:${state.phase2Statements.length}`;
+      if (autoActionKeyRef.current === key) return;
+      autoActionKeyRef.current = key;
+      void runAiDefenseFor(state, speaker);
+    }
+  }, [loading, runAiDefenseFor, runAiSpeechFor, state]);
 
   async function startGame() {
     if (!playerName.trim()) {
@@ -115,49 +212,24 @@ export function GameShell() {
         playerCount,
         wordPair,
       });
+      autoActionKeyRef.current = "";
       setState(next);
       setSelectedTarget("");
       setSpeechText("");
       setDefenseText("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
-      toast.error(message === "MODEL_ENV_INVALID" ? t("configMissing") : t("modelError", { message }));
+      showModelError(error);
     } finally {
       setLoading(false);
     }
   }
 
   function resetGame() {
+    autoActionKeyRef.current = "";
     setState(null);
     setSpeechText("");
     setDefenseText("");
     setSelectedTarget("");
-  }
-
-  async function generateAiSpeech() {
-    if (!state || !currentSpeaker) return;
-    setLoading(true);
-
-    try {
-      const data = await postJson<ApiResult<Phase1SpeechOutput>>("/api/ai/act", {
-        action: "phase1Speech",
-        locale,
-        actor: actorPayload(currentSpeaker),
-        candidates: candidatePayload(getVoteCandidates(state, currentSpeaker.id)),
-        context: {
-          round: state.phase1Round,
-          participants: publicParticipants(state),
-          previousSpeeches: state.speeches.filter(
-            (speech) => speech.round === state.phase1Round,
-          ),
-        },
-      });
-      setState(recordSpeech(state, currentSpeaker.id, data.result.speech));
-    } catch (error) {
-      showModelError(error);
-    } finally {
-      setLoading(false);
-    }
   }
 
   function submitPlayerSpeech() {
@@ -177,14 +249,14 @@ export function GameShell() {
         {
           voterId: PLAYER_ID,
           targetId: target,
-          reason: t("playerVoteReason"),
+          reason: t("voted"),
         },
       ];
 
       for (const actor of state.participants.filter(
         (participant) => participant.active && participant.kind === "ai",
       )) {
-        const data = await postJson<ApiResult<VoteActionOutput>>("/api/ai/act", {
+        const data = await postJson<ApiResult<Phase1VoteOutput>>("/api/ai/act", {
           action: "phase1Vote",
           locale,
           actor: actorPayload(actor),
@@ -200,43 +272,13 @@ export function GameShell() {
         votes.push({
           voterId: actor.id,
           targetId: data.result.targetId,
-          reason: data.result.reason,
+          reason: t("voted"),
         });
       }
 
+      autoActionKeyRef.current = "";
       setState(recordPhase1Votes(state, votes));
       setSelectedTarget("");
-    } catch (error) {
-      showModelError(error);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function generateAiDefense() {
-    if (!state || !currentSpeaker) return;
-    setLoading(true);
-
-    try {
-      const data = await postJson<ApiResult<Phase2DefenseOutput>>("/api/ai/act", {
-        action: "phase2Defense",
-        locale,
-        actor: actorPayload(currentSpeaker),
-        candidates: candidatePayload(getVoteCandidates(state, currentSpeaker.id)),
-        context: {
-          phaseOne: buildPhase2Context(state),
-          previousPhaseTwoStatements: state.phase2Statements,
-        },
-      });
-      setState(
-        recordPhase2Statement(state, {
-          speakerId: currentSpeaker.id,
-          claim: data.result.claim,
-          suspicionTargetId: data.result.suspicionTargetId,
-          suspicionReason: data.result.suspicionReason,
-          contextAnchors: data.result.contextAnchors,
-        }),
-      );
     } catch (error) {
       showModelError(error);
     } finally {
@@ -279,7 +321,7 @@ export function GameShell() {
       for (const actor of state.participants.filter(
         (participant) => participant.active && participant.kind === "ai",
       )) {
-        const data = await postJson<ApiResult<VoteActionOutput>>("/api/ai/act", {
+        const data = await postJson<ApiResult<Phase2VoteOutput>>("/api/ai/act", {
           action: "phase2Vote",
           locale,
           actor: actorPayload(actor),
@@ -305,14 +347,9 @@ export function GameShell() {
     }
   }
 
-  function showModelError(error: unknown) {
-    const message = error instanceof Error ? error.message : "UNKNOWN_ERROR";
-    toast.error(t("modelError", { message }));
-  }
-
   return (
     <main className="mx-auto grid w-full max-w-7xl gap-4 px-4 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="panel min-h-[680px] overflow-hidden">
+      <section className="panel flex min-h-[720px] flex-col overflow-hidden">
         <div className="border-b border-[var(--line)] p-5">
           <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
             {state?.stage?.startsWith("phase2") ? t("phase2") : t("phase1")}
@@ -333,65 +370,75 @@ export function GameShell() {
             onStart={startGame}
           />
         ) : (
-          <div className="grid gap-5 p-5">
-            <PlayerSecret state={state} />
-            {state.stage === "phase1_speech" && currentSpeaker ? (
-              <SpeechPanel
-                currentSpeaker={currentSpeaker}
-                loading={loading}
-                text={speechText}
-                onTextChange={setSpeechText}
-                onSubmit={submitPlayerSpeech}
-                onGenerate={generateAiSpeech}
-              />
-            ) : null}
-            {state.stage === "phase1_vote" ? (
-              <VotePanel
-                title={t("phase1VoteTitle")}
-                help={t("phase1VoteHelp")}
-                candidates={getVoteCandidates(state, PLAYER_ID)}
-                selectedTarget={selectedTarget}
-                loading={loading}
-                onSelect={setSelectedTarget}
-                onComplete={completePhase1Vote}
-              />
-            ) : null}
-            {state.stage === "phase2_defense" && currentSpeaker ? (
-              <DefensePanel
-                currentSpeaker={currentSpeaker}
-                candidates={voteCandidates}
-                loading={loading}
-                text={defenseText}
-                selectedTarget={selectedTarget}
-                onTextChange={setDefenseText}
-                onSelect={setSelectedTarget}
-                onSubmit={submitPlayerDefense}
-                onGenerate={generateAiDefense}
-              />
-            ) : null}
-            {state.stage === "phase2_vote" ? (
-              <VotePanel
-                title={t("phase2VoteTitle")}
-                help={t("phase2VoteHelp")}
-                candidates={getVoteCandidates(state, PLAYER_ID)}
-                selectedTarget={selectedTarget}
-                loading={loading}
-                onSelect={setSelectedTarget}
-                onComplete={completePhase2Vote}
-              />
-            ) : null}
-            {state.stage === "final" ? (
-              <ResultPanel state={state} onRestart={resetGame} />
-            ) : null}
-          </div>
+          <>
+            <ChatTimeline
+              state={state}
+              currentSpeaker={currentSpeaker}
+              loading={loading}
+              dateLocale={dateLocale}
+            />
+            <div className="border-t border-[var(--line)] bg-[var(--panel-strong)] p-4">
+              {state.stage === "phase1_speech" && currentSpeaker ? (
+                currentSpeaker.id === PLAYER_ID ? (
+                  <SpeechComposer
+                    text={speechText}
+                    onTextChange={setSpeechText}
+                    onSubmit={submitPlayerSpeech}
+                  />
+                ) : (
+                  <TypingStatus speaker={currentSpeaker} loading={loading} />
+                )
+              ) : null}
+              {state.stage === "phase1_vote" ? (
+                <VotePanel
+                  title={t("phase1VoteTitle")}
+                  help={t("phase1VoteHelp")}
+                  candidates={getVoteCandidates(state, PLAYER_ID)}
+                  selectedTarget={selectedTarget}
+                  loading={loading}
+                  onSelect={setSelectedTarget}
+                  onComplete={completePhase1Vote}
+                />
+              ) : null}
+              {state.stage === "phase2_defense" && currentSpeaker ? (
+                currentSpeaker.id === PLAYER_ID ? (
+                  <DefenseComposer
+                    candidates={voteCandidates}
+                    text={defenseText}
+                    selectedTarget={selectedTarget}
+                    onTextChange={setDefenseText}
+                    onSelect={setSelectedTarget}
+                    onSubmit={submitPlayerDefense}
+                  />
+                ) : (
+                  <TypingStatus speaker={currentSpeaker} loading={loading} />
+                )
+              ) : null}
+              {state.stage === "phase2_vote" ? (
+                <VotePanel
+                  title={t("phase2VoteTitle")}
+                  help={t("phase2VoteHelp")}
+                  candidates={getVoteCandidates(state, PLAYER_ID)}
+                  selectedTarget={selectedTarget}
+                  loading={loading}
+                  onSelect={setSelectedTarget}
+                  onComplete={completePhase2Vote}
+                />
+              ) : null}
+              {state.stage === "final" ? (
+                <ResultPanel state={state} onRestart={resetGame} />
+              ) : null}
+            </div>
+          </>
         )}
       </section>
 
       <aside className="grid content-start gap-4">
         {state ? (
           <>
+            <PlayerSecret state={state} />
             <ParticipantsPanel state={state} />
-            <ActivityPanel state={state} dateLocale={dateLocale} />
+            <StageHint state={state} />
           </>
         ) : (
           <div className="panel p-5">
@@ -464,115 +511,288 @@ function PlayerSecret({ state }: { state: GameState }) {
   if (!player) return null;
 
   return (
-    <div className="grid gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] p-4 sm:grid-cols-3">
+    <section className="panel grid gap-3 p-4">
       <Info label={t("yourWord")} value={player.word} />
-      <Info label={t("yourRole")} value={t(player.role)} />
-      <Info label={t("round", { round: state.phase1Round })} value={state.wordPair.category} />
+      <Info label={t("round", { round: state.phase1Round })} value={t("inProgress")} />
+    </section>
+  );
+}
+
+export function ChatTimeline({
+  state,
+  currentSpeaker,
+  loading,
+  dateLocale,
+}: {
+  state: GameState;
+  currentSpeaker: Participant | null | undefined;
+  loading: boolean;
+  dateLocale: DateFnsLocale;
+}) {
+  const t = useTranslations("game");
+  const records = buildTimelineRecords(state);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const showTyping =
+    loading &&
+    currentSpeaker?.kind === "ai" &&
+    (state.stage === "phase1_speech" || state.stage === "phase2_defense");
+  const lastRecord = records.at(-1);
+  const lastRecordKey = lastRecord ? `${lastRecord.type}:${lastRecord.record.id}` : "empty";
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+
+    element.scrollTop = element.scrollHeight;
+  }, [lastRecordKey, records.length, showTyping, state.stage]);
+
+  return (
+    <div
+      ref={scrollRef}
+      className="h-[460px] overflow-y-auto p-5 sm:h-[520px] lg:h-[560px]"
+      data-testid="chat-timeline"
+    >
+      {records.length === 0 ? (
+        <div className="grid h-full min-h-80 place-items-center rounded-lg border border-dashed border-[var(--line)] p-8 text-center">
+          <div>
+            <Sparkles className="mx-auto mb-3 text-[var(--accent)]" size={28} />
+            <p className="text-sm text-[var(--muted-foreground)]">{t("noActivity")}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {records.map((item) => (
+            <TimelineItem
+              key={`${item.type}-${item.record.id}`}
+              state={state}
+              item={item}
+              dateLocale={dateLocale}
+            />
+          ))}
+        </div>
+      )}
+      {showTyping && currentSpeaker ? (
+        <div className="mt-4">
+          <TypingStatus speaker={currentSpeaker} loading={loading} />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function SpeechPanel({
-  currentSpeaker,
-  loading,
+function buildTimelineRecords(state: GameState) {
+  return [
+    ...state.speeches.map((record) => ({ type: "speech" as const, createdAt: record.createdAt, record })),
+    ...state.phase2Statements.map((record) => ({ type: "defense" as const, createdAt: record.createdAt, record })),
+    ...state.eliminations.map((record) => ({ type: "elimination" as const, createdAt: record.createdAt, record })),
+    ...state.phase1Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
+    ...state.phase2Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
+  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+function TimelineItem({
+  state,
+  item,
+  dateLocale,
+}: {
+  state: GameState;
+  item:
+    | { type: "speech"; createdAt: string; record: GameState["speeches"][number] }
+    | { type: "defense"; createdAt: string; record: Phase2Statement }
+    | { type: "elimination"; createdAt: string; record: GameState["eliminations"][number] }
+    | { type: "vote"; createdAt: string; record: VoteRecord };
+  dateLocale: DateFnsLocale;
+}) {
+  const t = useTranslations("game");
+  const name = (id: string) =>
+    state.participants.find((participant) => participant.id === id)?.name ?? id;
+
+  if (item.type === "speech") {
+    return (
+      <ChatBubble
+        speaker={state.participants.find((participant) => participant.id === item.record.speakerId)}
+        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
+        body={item.record.text}
+      />
+    );
+  }
+
+  if (item.type === "defense") {
+    return (
+      <ChatBubble
+        speaker={state.participants.find((participant) => participant.id === item.record.speakerId)}
+        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
+        body={item.record.claim}
+        meta={
+          <>
+            <span className="block font-semibold text-[var(--foreground)]">
+              {t("suspectsLabel")}
+              {name(item.record.suspicionTargetId)}
+            </span>
+            <span className="mt-1 block">
+              {t("suspicionReasonLabel")}
+              {item.record.suspicionReason}
+            </span>
+          </>
+        }
+      />
+    );
+  }
+
+  if (item.type === "elimination") {
+    return (
+      <SystemEvent
+        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
+        body={`${t("eliminated")}: ${name(item.record.eliminatedId)}`}
+      />
+    );
+  }
+
+  const voteBody =
+    item.record.phase === "phase1"
+      ? `${name(item.record.voterId)} -> ${name(item.record.targetId)}`
+      : `${name(item.record.voterId)} -> ${name(item.record.targetId)}：${item.record.reason}`;
+
+  return (
+    <SystemEvent
+      time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
+      body={voteBody}
+    />
+  );
+}
+
+function ChatBubble({
+  speaker,
+  time,
+  body,
+  meta,
+}: {
+  speaker?: Participant;
+  time: string;
+  body: string;
+  meta?: ReactNode;
+}) {
+  const isPlayer = speaker?.id === PLAYER_ID;
+
+  return (
+    <article className={`flex gap-3 ${isPlayer ? "justify-end" : "justify-start"}`}>
+      {!isPlayer ? <Avatar participant={speaker} /> : null}
+      <div className={`max-w-[78%] ${isPlayer ? "text-right" : ""}`}>
+        <div className="mb-1 flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <span className="font-semibold text-[var(--foreground)]">{speaker?.name}</span>
+          <time>{time}</time>
+        </div>
+        <p className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-4 py-3 text-left text-sm leading-6">
+          {body}
+        </p>
+        {meta ? (
+          <div className="mt-2 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-left text-xs leading-5 text-[var(--muted-foreground)]">
+            {meta}
+          </div>
+        ) : null}
+      </div>
+      {isPlayer ? <Avatar participant={speaker} /> : null}
+    </article>
+  );
+}
+
+function SystemEvent({ time, body }: { time: string; body: string }) {
+  return (
+    <div className="mx-auto max-w-[86%] rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-center text-xs text-[var(--muted-foreground)]">
+      <time className="mr-2">{time}</time>
+      <span>{body}</span>
+    </div>
+  );
+}
+
+function Avatar({ participant }: { participant?: Participant }) {
+  return (
+    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] text-[var(--accent)]">
+      {participant?.kind === "human" ? <User size={17} /> : <Bot size={17} />}
+    </div>
+  );
+}
+
+function SpeechComposer({
   text,
   onTextChange,
   onSubmit,
-  onGenerate,
 }: {
-  currentSpeaker: Participant;
-  loading: boolean;
   text: string;
   onTextChange: (value: string) => void;
   onSubmit: () => void;
-  onGenerate: () => void;
 }) {
   const t = useTranslations("game");
-  const isPlayer = currentSpeaker.id === PLAYER_ID;
 
   return (
-    <div className="grid gap-4">
-      <SpeakerHeader speaker={currentSpeaker} />
-      {isPlayer ? (
-        <>
-          <textarea
-            className="field min-h-32 resize-y"
-            value={text}
-            onChange={(event) => onTextChange(event.target.value)}
-            placeholder={t("speechPlaceholder")}
-          />
-          <Button type="button" onClick={onSubmit}>
-            <CircleDot size={16} />
-            {t("submitSpeech")}
-          </Button>
-        </>
-      ) : (
-        <Button type="button" disabled={loading} onClick={onGenerate}>
-          {loading ? <Loader2 className="animate-spin" size={16} /> : <Bot size={16} />}
-          {loading ? t("generatingAi") : t("generateSpeech")}
+    <div className="grid gap-3" data-testid="player-composer">
+      <textarea
+        className="field min-h-24 resize-y"
+        value={text}
+        onChange={(event) => onTextChange(event.target.value)}
+        placeholder={t("speechPlaceholder")}
+      />
+      <div className="flex justify-end">
+        <Button type="button" onClick={onSubmit}>
+          <Send size={16} />
+          {t("submitSpeech")}
         </Button>
-      )}
+      </div>
     </div>
   );
 }
 
-function DefensePanel({
-  currentSpeaker,
+function DefenseComposer({
   candidates,
-  loading,
   text,
   selectedTarget,
   onTextChange,
   onSelect,
   onSubmit,
-  onGenerate,
 }: {
-  currentSpeaker: Participant;
   candidates: Participant[];
-  loading: boolean;
   text: string;
   selectedTarget: string;
   onTextChange: (value: string) => void;
   onSelect: (value: string) => void;
   onSubmit: () => void;
-  onGenerate: () => void;
 }) {
   const t = useTranslations("game");
-  const isPlayer = currentSpeaker.id === PLAYER_ID;
 
   return (
-    <div className="grid gap-4">
-      <div>
-        <h2 className="text-xl font-semibold">{t("phase2DefenseTitle")}</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-          {t("phase2DefenseHelp")}
-        </p>
-      </div>
-      <SpeakerHeader speaker={currentSpeaker} />
-      {isPlayer ? (
-        <>
-          <textarea
-            className="field min-h-32 resize-y"
-            value={text}
-            onChange={(event) => onTextChange(event.target.value)}
-            placeholder={t("defensePlaceholder")}
-          />
-          <TargetSelect
-            candidates={candidates}
-            value={selectedTarget}
-            onChange={onSelect}
-          />
-          <Button type="button" onClick={onSubmit}>
-            <CircleDot size={16} />
-            {t("submitDefense")}
-          </Button>
-        </>
-      ) : (
-        <Button type="button" disabled={loading} onClick={onGenerate}>
-          {loading ? <Loader2 className="animate-spin" size={16} /> : <Bot size={16} />}
-          {loading ? t("generatingAi") : t("generateDefense")}
+    <div className="grid gap-3" data-testid="player-composer">
+      <textarea
+        className="field min-h-24 resize-y"
+        value={text}
+        onChange={(event) => onTextChange(event.target.value)}
+        placeholder={t("defensePlaceholder")}
+      />
+      <TargetSelect candidates={candidates} value={selectedTarget} onChange={onSelect} />
+      <div className="flex justify-end">
+        <Button type="button" onClick={onSubmit}>
+          <Send size={16} />
+          {t("submitDefense")}
         </Button>
-      )}
+      </div>
+    </div>
+  );
+}
+
+function TypingStatus({
+  speaker,
+  loading,
+}: {
+  speaker: Participant;
+  loading: boolean;
+}) {
+  const t = useTranslations("game");
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 text-sm text-[var(--muted-foreground)]">
+      <Avatar participant={speaker} />
+      <span className="font-semibold text-[var(--foreground)]">{speaker.name}</span>
+      {loading ? <Loader2 className="animate-spin text-[var(--accent)]" size={16} /> : null}
+      <span>{t("aiTyping")}</span>
     </div>
   );
 }
@@ -651,16 +871,23 @@ function ParticipantsPanel({ state }: { state: GameState }) {
       <div className="grid gap-2">
         {state.participants.map((participant) => (
           <div
-            className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-sm"
+            className="grid gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-sm"
             key={participant.id}
           >
-            <span className="inline-flex min-w-0 items-center gap-2">
-              {participant.kind === "human" ? <User size={15} /> : <Bot size={15} />}
-              <span className="truncate">{participant.name}</span>
-            </span>
-            <span className={participant.active ? "text-[var(--accent)]" : "text-[var(--danger)]"}>
-              {participant.active ? t("active") : t("eliminated")}
-            </span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex min-w-0 items-center gap-2">
+                {participant.kind === "human" ? <User size={15} /> : <Bot size={15} />}
+                <span className="truncate">{participant.name}</span>
+              </span>
+              <span className={participant.active ? "text-[var(--accent)]" : "text-[var(--danger)]"}>
+                {participant.active ? t("active") : t("eliminated")}
+              </span>
+            </div>
+            {participant.persona ? (
+              <span className="truncate text-xs text-[var(--muted-foreground)]">
+                {participant.persona.label}
+              </span>
+            ) : null}
           </div>
         ))}
       </div>
@@ -668,98 +895,18 @@ function ParticipantsPanel({ state }: { state: GameState }) {
   );
 }
 
-function ActivityPanel({
-  state,
-  dateLocale,
-}: {
-  state: GameState;
-  dateLocale: DateFnsLocale;
-}) {
+function StageHint({ state }: { state: GameState }) {
   const t = useTranslations("game");
-  const records = [
-    ...state.speeches.map((record) => ({ type: "speech" as const, createdAt: record.createdAt, record })),
-    ...state.eliminations.map((record) => ({ type: "elimination" as const, createdAt: record.createdAt, record })),
-    ...state.phase2Statements.map((record) => ({ type: "defense" as const, createdAt: record.createdAt, record })),
-    ...state.phase1Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
-    ...state.phase2Votes.map((record) => ({ type: "vote" as const, createdAt: record.createdAt, record })),
-  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
   return (
-    <section className="panel max-h-[620px] overflow-auto p-4">
-      <h2 className="mb-3 text-sm font-semibold uppercase text-[var(--accent)]">
-        {t("activity")}
+    <section className="panel p-4">
+      <h2 className="mb-2 text-sm font-semibold uppercase text-[var(--accent)]">
+        {state.stage.startsWith("phase2") ? t("phase2") : t("phase1")}
       </h2>
-      {records.length === 0 ? (
-        <p className="text-sm text-[var(--muted-foreground)]">{t("noActivity")}</p>
-      ) : (
-        <div className="grid gap-3">
-          {records.map((item) => (
-            <ActivityItem
-              key={`${item.type}-${item.record.id}`}
-              state={state}
-              item={item}
-              dateLocale={dateLocale}
-            />
-          ))}
-        </div>
-      )}
+      <p className="text-sm leading-6 text-[var(--muted-foreground)]">
+        {state.stage.startsWith("phase2") ? t("stageContext") : t("hiddenForPlayer")}
+      </p>
     </section>
-  );
-}
-
-function ActivityItem({
-  state,
-  item,
-  dateLocale,
-}: {
-  state: GameState;
-  item:
-    | { type: "speech"; createdAt: string; record: GameState["speeches"][number] }
-    | { type: "elimination"; createdAt: string; record: GameState["eliminations"][number] }
-    | { type: "defense"; createdAt: string; record: Phase2Statement }
-    | { type: "vote"; createdAt: string; record: VoteRecord };
-  dateLocale: DateFnsLocale;
-}) {
-  const t = useTranslations("game");
-  const name = (id: string) =>
-    state.participants.find((participant) => participant.id === id)?.name ?? id;
-
-  if (item.type === "speech") {
-    return (
-      <LogItem
-        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
-        title={name(item.record.speakerId)}
-        body={item.record.text}
-      />
-    );
-  }
-
-  if (item.type === "defense") {
-    return (
-      <LogItem
-        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
-        title={name(item.record.speakerId)}
-        body={`${item.record.claim} ${t("suspicion")}: ${name(item.record.suspicionTargetId)}. ${item.record.suspicionReason}`}
-      />
-    );
-  }
-
-  if (item.type === "elimination") {
-    return (
-      <LogItem
-        time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
-        title={t("eliminated")}
-        body={name(item.record.eliminatedId)}
-      />
-    );
-  }
-
-  return (
-    <LogItem
-      time={format(new Date(item.createdAt), "HH:mm:ss", { locale: dateLocale })}
-      title={`${name(item.record.voterId)} -> ${name(item.record.targetId)}`}
-      body={item.record.reason}
-    />
   );
 }
 
@@ -789,45 +936,11 @@ function ResultPanel({
   );
 }
 
-function SpeakerHeader({ speaker }: { speaker: Participant }) {
-  const t = useTranslations("game");
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] p-4">
-      <span className="text-sm text-[var(--muted-foreground)]">{t("speaker")}</span>
-      <span className="inline-flex items-center gap-2 font-semibold">
-        {speaker.kind === "human" ? <User size={18} /> : <Bot size={18} />}
-        {speaker.name}
-      </span>
-    </div>
-  );
-}
-
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1">
       <span className="text-xs uppercase text-[var(--muted-foreground)]">{label}</span>
       <strong className="text-lg">{value}</strong>
     </div>
-  );
-}
-
-function LogItem({
-  time,
-  title,
-  body,
-}: {
-  time: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <article className="rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] p-3">
-      <div className="mb-1 flex items-center justify-between gap-3 text-xs text-[var(--muted-foreground)]">
-        <span className="truncate font-semibold text-[var(--foreground)]">{title}</span>
-        <time>{time}</time>
-      </div>
-      <p className="text-sm leading-6 text-[var(--muted-foreground)]">{body}</p>
-    </article>
   );
 }

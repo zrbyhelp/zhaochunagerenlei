@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex h-[var(--control-height)] items-center justify-center gap-2 rounded-lg px-[var(--button-x)] text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -17,9 +17,9 @@ const buttonVariants = cva(
           "bg-[var(--danger)] text-white hover:brightness-110 focus-visible:outline-[var(--danger)]",
       },
       size: {
-        sm: "h-8 px-3 text-xs",
-        md: "h-10 px-4",
-        icon: "h-10 w-10 px-0",
+        sm: "h-[calc(var(--control-height)*0.8)] px-[calc(var(--button-x)*0.75)] text-xs",
+        md: "h-[var(--control-height)] px-[var(--button-x)]",
+        icon: "h-[var(--control-height)] w-[var(--control-height)] px-0",
       },
     },
     defaultVariants: {
