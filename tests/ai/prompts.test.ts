@@ -45,6 +45,8 @@ describe("AI prompts", () => {
     expect(prompt.system).toContain("Voting bias");
     expect(prompt.system).toContain("跟风偏差");
     expect(prompt.system).toContain("Speak naturally");
+    expect(prompt.system).toContain("AI participant");
+    expect(prompt.system).toContain("hidden human");
     expect(prompt.user).toContain("real player");
     expect(prompt.user).toContain("worried you might be the undercover");
     expect(prompt.user).toContain("Give only one low-risk clue");
@@ -91,8 +93,32 @@ describe("AI prompts", () => {
     const joined = `${prompt.system}\n${prompt.user}`;
 
     expect(joined).toContain("true word pair");
-    expect(joined).toContain("what you thought others were probably describing");
-    expect(joined).toContain("why your own speech or vote made sense");
+    expect(joined).toContain("AI screening hearing");
+    expect(joined).toContain("not the hidden human");
+    expect(joined).toContain("not mainly about solving the undercover word");
+    expect(joined).toContain("human disguise");
+    expect(joined).toContain("what you thought others were describing in phase one");
+    expect(joined).toContain("your AI-like behavior");
     expect(joined).toContain("ownWord");
+  });
+
+  it("keeps phase-two votes focused on finding the hidden human", () => {
+    const prompt = actionPrompt({
+      action: "phase2Vote",
+      locale: "zh-CN",
+      actor: {
+        id: "ai-3",
+        name: "沈砚",
+        word: "订书机",
+      },
+      candidates: [{ id: "player", name: "玩家" }],
+      context: { phaseOne: {}, phaseTwoStatements: [] },
+    });
+    const joined = `${prompt.system}\n${prompt.user}`;
+
+    expect(joined).toContain("hidden human pretending to be AI");
+    expect(joined).toContain("human-screening vote");
+    expect(joined).toContain("behavioral evidence only");
+    expect(joined).toContain("Do not make the vote reason mainly about who had the wrong word");
   });
 });
