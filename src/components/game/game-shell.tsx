@@ -85,6 +85,22 @@ function votePayload(votes: Array<Pick<VoteRecord, "voterId" | "targetId">>) {
   return votes.map(({ voterId, targetId }) => ({ voterId, targetId }));
 }
 
+export function isPhaseTwoView(state: GameState | null | undefined) {
+  if (!state) return false;
+
+  return (
+    state.stage.startsWith("phase2") ||
+    (state.stage === "final" && state.result?.outcome.startsWith("phase2"))
+  );
+}
+
+export function isEliminatedForDisplay(state: GameState, participant: Participant) {
+  return (
+    !participant.active ||
+    (state.stage === "final" && Boolean(state.result?.topVotedIds.includes(participant.id)))
+  );
+}
+
 export function GameShell() {
   const t = useTranslations("game");
   const locale = useLocale() as Locale;
@@ -362,7 +378,7 @@ export function GameShell() {
       >
         <div className="border-b border-[var(--line)] p-4 sm:p-5">
           <p className="mb-2 text-xs font-semibold uppercase text-[var(--accent)]">
-            {state?.stage?.startsWith("phase2") ? t("phase2") : t("phase1")}
+            {isPhaseTwoView(state) ? t("phase2") : t("phase1")}
           </p>
           <h1 className="text-2xl font-semibold text-balance sm:text-3xl">{t("title")}</h1>
           <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted-foreground)] sm:mt-3 sm:text-sm sm:leading-6">
@@ -531,10 +547,17 @@ function PlayerSecret({ state }: { state: GameState }) {
 
   if (!player) return null;
 
+  const phaseLabel = isPhaseTwoView(state) ? t("phase2") : t("phase1");
+  const progressLabel = state.stage === "final" ? phaseLabel : t("round", { round: state.phase1Round });
+  const progressValue =
+    state.stage === "final" && state.result
+      ? t(state.result.messageKey)
+      : t("inProgress");
+
   return (
     <section className="panel grid gap-3 p-4">
       <Info label={t("yourWord")} value={player.word} />
-      <Info label={t("round", { round: state.phase1Round })} value={t("inProgress")} />
+      <Info label={progressLabel} value={progressValue} />
     </section>
   );
 }
@@ -544,6 +567,13 @@ function MobilePlayerTip({ state }: { state: GameState }) {
   const player = state.participants.find((participant) => participant.id === PLAYER_ID);
 
   if (!player) return null;
+
+  const phaseLabel = isPhaseTwoView(state) ? t("phase2") : t("phase1");
+  const progressLabel = state.stage === "final" ? phaseLabel : t("round", { round: state.phase1Round });
+  const progressValue =
+    state.stage === "final" && state.result
+      ? t(state.result.messageKey)
+      : t("inProgress");
 
   return (
     <section
@@ -560,10 +590,10 @@ function MobilePlayerTip({ state }: { state: GameState }) {
       </div>
       <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] px-3 py-2">
         <span className="block text-[10px] font-semibold uppercase text-[var(--muted-foreground)]">
-          {t("round", { round: state.phase1Round })}
+          {progressLabel}
         </span>
         <strong className="mt-0.5 block truncate text-base text-[var(--foreground)]">
-          {t("inProgress")}
+          {progressValue}
         </strong>
       </div>
     </section>
@@ -915,27 +945,31 @@ function ParticipantsPanel({ state }: { state: GameState }) {
         {t("participants")}
       </h2>
       <div className="grid gap-2">
-        {state.participants.map((participant) => (
-          <div
-            className="grid gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-sm"
-            key={participant.id}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="inline-flex min-w-0 items-center gap-2">
-                {participant.kind === "human" ? <User size={15} /> : <Bot size={15} />}
-                <span className="truncate">{participant.name}</span>
-              </span>
-              <span className={participant.active ? "text-[var(--accent)]" : "text-[var(--danger)]"}>
-                {participant.active ? t("active") : t("eliminated")}
-              </span>
+        {state.participants.map((participant) => {
+          const eliminated = isEliminatedForDisplay(state, participant);
+
+          return (
+            <div
+              className="grid gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-strong)] px-3 py-2 text-sm"
+              key={participant.id}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  {participant.kind === "human" ? <User size={15} /> : <Bot size={15} />}
+                  <span className="truncate">{participant.name}</span>
+                </span>
+                <span className={eliminated ? "text-[var(--danger)]" : "text-[var(--accent)]"}>
+                  {eliminated ? t("eliminated") : t("active")}
+                </span>
+              </div>
+              {participant.persona ? (
+                <span className="truncate text-xs text-[var(--muted-foreground)]">
+                  {participant.persona.label}
+                </span>
+              ) : null}
             </div>
-            {participant.persona ? (
-              <span className="truncate text-xs text-[var(--muted-foreground)]">
-                {participant.persona.label}
-              </span>
-            ) : null}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -947,10 +981,10 @@ function StageHint({ state }: { state: GameState }) {
   return (
     <section className="panel p-4">
       <h2 className="mb-2 text-sm font-semibold uppercase text-[var(--accent)]">
-        {state.stage.startsWith("phase2") ? t("phase2") : t("phase1")}
+        {isPhaseTwoView(state) ? t("phase2") : t("phase1")}
       </h2>
       <p className="text-sm leading-6 text-[var(--muted-foreground)]">
-        {state.stage.startsWith("phase2") ? t("stageContext") : t("hiddenForPlayer")}
+        {isPhaseTwoView(state) ? t("stageContext") : t("hiddenForPlayer")}
       </p>
     </section>
   );

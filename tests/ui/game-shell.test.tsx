@@ -4,7 +4,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { zhCN } from "date-fns/locale";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { ChatTimeline, GameShell } from "@/components/game/game-shell";
+import {
+  ChatTimeline,
+  GameShell,
+  isEliminatedForDisplay,
+  isPhaseTwoView,
+} from "@/components/game/game-shell";
 import { PLAYER_ID } from "@/lib/game/state";
 import type { GameState } from "@/lib/game/types";
 import zhMessages from "@/messages/zh-CN.json";
@@ -196,5 +201,22 @@ describe("GameShell", () => {
     expect(screen.getByText("我刚才说的是办公桌上很常见的东西，不是临时编的。")).toBeInTheDocument();
     expect(screen.getByText("怀疑：臧浩然")).toBeInTheDocument();
     expect(screen.queryByText("理由：你一阶段投票太快，像是想顺着别人走。")).not.toBeInTheDocument();
+  });
+
+  it("keeps final phase-two display state after phase-two votes", () => {
+    const finalState: GameState = {
+      ...baseTimelineState,
+      stage: "final",
+      result: {
+        outcome: "phase2_player_lost",
+        messageKey: "phase2Lose",
+        playerTopVoted: true,
+        topVotedIds: [PLAYER_ID],
+      },
+    };
+
+    expect(isPhaseTwoView(finalState)).toBe(true);
+    expect(isEliminatedForDisplay(finalState, finalState.participants[0])).toBe(true);
+    expect(isEliminatedForDisplay(finalState, finalState.participants[1])).toBe(false);
   });
 });
