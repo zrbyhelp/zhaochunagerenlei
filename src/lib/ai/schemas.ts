@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const WordPairSchema = z.object({
-  commonWord: z.string().min(1).max(20),
-  undercoverWord: z.string().min(1).max(20),
-  category: z.string().min(1).max(30),
-  sceneIntro: z.string().min(10).max(220),
+  commonWord: z.string().min(1),
+  undercoverWord: z.string().min(1),
+  category: z.string().min(1),
+  sceneIntro: z.string().min(1),
 });
 
 export const AiActorSchema = z.object({
@@ -36,27 +36,25 @@ export const AiActionRequestSchema = z.object({
 });
 
 export const Phase1SpeechSchema = z.object({
-  speech: z.string().min(4).max(160),
+  speech: z.string().min(1),
 });
 
-export const Phase1VoteSchema = z
-  .object({
-    targetId: z.string().min(1),
-  })
-  .strict();
+export const Phase1VoteSchema = z.object({
+  targetId: z.string().min(1),
+});
 
 export const Phase2VoteSchema = z.object({
   targetId: z.string().min(1),
-  reason: z.string().min(4).max(180),
+  reason: z.string().min(1),
 });
 
 export const VoteActionSchema = Phase2VoteSchema;
 
 export const Phase2DefenseSchema = z.object({
-  claim: z.string().min(8).max(260),
+  claim: z.string().min(1),
   suspicionTargetId: z.string().min(1),
-  suspicionReason: z.string().min(8).max(220),
-  contextAnchors: z.array(z.string().min(2).max(80)).min(1),
+  suspicionReason: z.string().default(""),
+  contextAnchors: z.array(z.string().min(1)).default([]),
 });
 
 export const AiActionResponseSchema = z.union([
